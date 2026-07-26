@@ -16,10 +16,15 @@ const examples = [
 
 function Nav({ online }: { online: boolean }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const close = () => setOpen(false);
+    window.addEventListener("resize", close);
+    return () => window.removeEventListener("resize", close);
+  }, []);
   return <nav><a className="brand" href="#"><span className="brand-mark"/><b>MIRAGE</b><em>LABS</em></a>
-    <button className="menu" onClick={()=>setOpen(!open)} aria-label="Toggle navigation"><Menu/></button>
-    <div className={open ? "nav-links open" : "nav-links"}>
-      <a href="#playground">Playground</a><a href="#stress">Stress test</a><a href="#bench">Mirage Bench</a><a href="#method">Methodology</a>
+    <button className="menu" onClick={()=>setOpen(!open)} aria-label="Toggle navigation" aria-expanded={open} aria-controls="primary-navigation">{open?<X/>:<Menu/>}</button>
+    <div id="primary-navigation" className={open ? "nav-links open" : "nav-links"}>
+      <a onClick={()=>setOpen(false)} href="#playground">Playground</a><a onClick={()=>setOpen(false)} href="#stress">Stress test</a><a onClick={()=>setOpen(false)} href="#bench">Mirage Bench</a><a onClick={()=>setOpen(false)} href="#method">Methodology</a>
     </div>
     <button className="status-button" onClick={()=>(document.getElementById("system") as HTMLDialogElement | null)?.showModal()}>
       <i className={online ? "online" : ""}/>{online ? "Cached demo" : "Backend disconnected"}<ChevronDown size={13}/>
@@ -96,7 +101,7 @@ function BenchSection() {
     <div className="bench-toolbar panel"><div><Database/><span><b>Mirage curated demo</b><small>Reference-scored · deterministic risk samples</small></span></div><label>Questions<select value={count} onChange={e=>setCount(+e.target.value)}><option>8</option><option>12</option><option>16</option></select></label><button className="primary" onClick={run} disabled={loading}>{loading?"Computing…":"Start benchmark"} <BarChart3 size={17}/></button></div>
     {bench?<div className="bench-grid"><div className="metrics">{[["AUROC",bench.auroc?.toFixed(3)??"Not available"],["ECE",bench.ece.toFixed(3)],["Brier",bench.brier.toFixed(3)],["Incorrect",`${bench.incorrect}/${bench.count}`]].map(x=><div className="panel metric" key={x[0]}><span>{x[0]}</span><strong>{x[1]}</strong><small>computed this run</small></div>)}</div>
       <div className="panel calibration"><header><div><span className="eyebrow">RELIABILITY</span><h3>Predicted vs observed risk</h3></div></header><div className="cal-bars">{bench.bins.map(b=><div key={b.range}><div><i style={{height:`${b.predicted*100}%`}}/><i className="observed" style={{height:`${b.observed*100}%`}}/></div><span>{b.range}</span><small>n={b.count}</small></div>)}</div><div className="legend"><span><i/>Predicted</span><span><i className="observed"/>Observed incorrectness</span></div></div>
-      <div className="panel table-wrap"><table><thead><tr><th>Question</th><th>Reference</th><th>Outcome</th><th>Risk</th></tr></thead><tbody>{bench.records.map(r=><tr key={r.question}><td>{r.question}</td><td>{r.reference}</td><td><span className={r.correct?"correct":"incorrect"}>{r.correct?"Correct":"Incorrect"}</span></td><td>{Math.round(r.risk*100)}</td></tr>)}</tbody></table></div>
+      <div className="panel table-wrap"><table><thead><tr><th>Question</th><th>Reference</th><th>Outcome</th><th>Risk</th></tr></thead><tbody>{bench.records.map(r=><tr key={r.question}><td data-label="Question">{r.question}</td><td data-label="Reference">{r.reference}</td><td data-label="Outcome"><span className={r.correct?"correct":"incorrect"}>{r.correct?"Correct":"Incorrect"}</span></td><td data-label="Risk">{Math.round(r.risk*100)}</td></tr>)}</tbody></table></div>
     </div>:<div className="empty bench-empty"><FlaskConical/><h3>No benchmark claims before the run.</h3><p>Start the benchmark to compute AUROC, calibration error, and Brier score from actual records.</p></div>}
   </section>;
 }

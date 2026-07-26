@@ -90,3 +90,12 @@ Production smoke tests confirmed:
 - Landing page: HTTP 200 with the expected Mirage title
 - `GET /api/v1/health`: HTTP 200, `cached_demo`
 - `POST /api/v1/analyse`: 14 token records and 6 semantic samples returned
+
+### Mobile optimisation verification
+
+The production interface was hardened for 320–390 px phone widths with safe-area
+insets, 44–50 px touch targets, an accessible collapsible navigation menu, stacked
+analysis controls, wrapped metadata, mobile benchmark result cards, and narrow-screen
+metric layouts. Browser checks confirmed no horizontal document overflow at either
+breakpoint, menu close-on-navigation, working analysis/benchmark flows, and zero
+rendered error states.
