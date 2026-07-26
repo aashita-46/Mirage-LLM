@@ -27,7 +27,7 @@ function Nav({ online }: { online: boolean }) {
       <a onClick={()=>setOpen(false)} href="#playground">Playground</a><a onClick={()=>setOpen(false)} href="#stress">Stress test</a><a onClick={()=>setOpen(false)} href="#bench">Mirage Bench</a><a onClick={()=>setOpen(false)} href="#method">Methodology</a>
     </div>
     <button className="status-button" onClick={()=>(document.getElementById("system") as HTMLDialogElement | null)?.showModal()}>
-      <i className={online ? "online" : ""}/>{online ? "Cached demo" : "Backend disconnected"}<ChevronDown size={13}/>
+      {online ? "Cached demo" : "Backend disconnected"}<ChevronDown size={13}/>
     </button>
   </nav>;
 }
