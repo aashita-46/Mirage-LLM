@@ -80,4 +80,13 @@ npm audit --audit-level=high
 npm run dev -- --host 127.0.0.1
 ```
 
-Production deployment URL is appended after Vercel deployment and smoke testing.
+## Production deployment
+
+**https://mirage-llm.vercel.app**
+
+Vercel deployment `dpl_Ae3GzsR3qYx6oXhfD24paS7dfUsg` reports **Ready**.
+Production smoke tests confirmed:
+
+- Landing page: HTTP 200 with the expected Mirage title
+- `GET /api/v1/health`: HTTP 200, `cached_demo`
+- `POST /api/v1/analyse`: 14 token records and 6 semantic samples returned
