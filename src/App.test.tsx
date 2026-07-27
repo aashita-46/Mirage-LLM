@@ -48,15 +48,19 @@ test("requires at least one enabled uncertainty signal", async () => {
   expect(screen.getByText("Enable at least one available signal.")).toBeInTheDocument();
 });
 
-test("credits both builders with profile links", () => {
+test("credits builders and the sarcastic Codex contributor with profile links", () => {
   render(<App />);
   expect(screen.getByRole("heading", { name: "Ninad Naik" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Aashita Jolly" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Codex, apparently" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Ninad Naik on LinkedIn" })).toHaveAttribute(
     "href", "https://www.linkedin.com/in/ninad-naik-274883262",
   );
   expect(screen.getByRole("link", { name: "Aashita Jolly on GitHub" })).toHaveAttribute(
     "href", "https://github.com/aashita-46",
+  );
+  expect(screen.getByRole("link", { name: "Codex, apparently on OpenAI" })).toHaveAttribute(
+    "href", "https://openai.com/codex/",
   );
 });
 

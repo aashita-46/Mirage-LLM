@@ -8,7 +8,7 @@ from api.core import DatasetExample, ExperimentConfig, ExperimentStore, Generati
 from api.core import DatasetManifest, load_manifest
 from api.dataset_tools import dataset_report
 from api.providers import OllamaProvider, OpenAICompatibleProvider, ProviderError, redact
-from api.semantics import cluster_responses
+from api.semantics import cluster_responses, hard_contradiction, threshold_sensitivity
 from api.statistics import (
     apply_isotonic,
     apply_platt,
@@ -116,6 +116,39 @@ def test_embedding_threshold_is_deterministic():
     low, _ = cluster_responses(texts, "embedding", .79, embedder=embed)
     high, _ = cluster_responses(texts, "embedding", .81, embedder=embed)
     assert len(low) == 1 and len(high) == 2
+
+
+def test_embedding_clustering_is_response_order_invariant():
+    texts = ["Ernest Hemingway wrote it.", "The author was Hemingway.", "Berlin is the capital."]
+    vectors = {texts[0]: [1.0, 0.0], texts[1]: [.99, .01], texts[2]: [0.0, 1.0]}
+    first, _ = cluster_responses(texts, "embedding", .8, embedder=lambda values: [vectors[value] for value in values])
+    reversed_texts = list(reversed(texts))
+    second, _ = cluster_responses(reversed_texts, "embedding", .8, embedder=lambda values: [vectors[value] for value in values])
+    assert sorted(sorted(cluster.responses) for cluster in first) == sorted(sorted(cluster.responses) for cluster in second)
+
+
+def test_contradiction_heuristics_cover_numbers_and_negation():
+    assert hard_contradiction("It improves survival.", "It does not improve survival.")
+    assert hard_contradiction("The answer is 1,000.", "The answer is 999.")
+    assert not hard_contradiction("The answer is 1,000.", "The answer is 1000.")
+    assert not hard_contradiction("No fewer than 20 people attended.", "At least 20 people attended.")
+
+
+def test_embedding_failures_and_empty_responses_are_explicit():
+    with pytest.raises(RuntimeError, match="missing or empty"):
+        cluster_responses(["a", "b"], "embedding", embedder=lambda values: [[1.0], []])
+    clusters, metadata = cluster_responses(["", "   "], "embedding", embedder=lambda values: [[1.0], [1.0]])
+    assert len(clusters) == 2
+    assert metadata["warnings"]
+
+
+def test_threshold_sensitivity_is_measured_without_selecting_threshold():
+    rows = threshold_sensitivity(
+        [(["a", "b"], 1)], [.7, .9],
+        embedder=lambda values: [[1.0, 0.0], [.8, .2]],
+    )
+    assert [row["threshold"] for row in rows] == [.7, .9]
+    assert all("mean_clusters" in row for row in rows)
 
 
 def test_bootstrap_and_paired_comparison_are_reproducible():

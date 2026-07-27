@@ -19,9 +19,22 @@ def fmt(value):
 
 
 def generated(group: str) -> tuple[str, str]:
-    records = [record for record in store.list() if record.config.experiment_group == group and record.model.mode == "live"]
+    records = [
+        record for record in store.list()
+        if record.config.experiment_group == group and record.model.mode == "live"
+        and record.state == "completed" and not record.dataset.get("demonstration")
+    ]
     if not records:
-        return "No completed live research-v1 results exist. This placeholder is intentionally retained.", "No completed live research-v1 model runs."
+        return f"No completed live results are eligible for `{group}`. This placeholder is intentionally retained.", f"No completed live model runs are eligible for `{group}`."
+    if group == "research-v1":
+        models = {record.model.model for record in records}
+        sufficiently_sized = [record for record in records if len(record.results) >= 200]
+        if len(models) < 3 or len(sufficiently_sized) < 3:
+            return (
+                "Official conclusion withheld: research-v1 requires three completed live model runs "
+                "with at least 200 eligible examples each.",
+                "Official model comparison unavailable because the stored experiment group does not meet eligibility requirements.",
+            )
     commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=False).stdout.strip() or "unavailable"
     dirty = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True, check=False).stdout.strip()
     if dirty:

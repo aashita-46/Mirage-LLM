@@ -18,6 +18,7 @@ from api.core import (
 )
 
 DEFAULT_TIMEOUT = float(os.getenv("MIRAGE_PROVIDER_TIMEOUT", "120"))
+SELF_VERIFICATION_PROMPT_VERSION = "mirage-self-verification-v1"
 
 
 def redact(value: str) -> str:
@@ -32,7 +33,9 @@ def redact(value: str) -> str:
 
 
 class ProviderError(RuntimeError):
-    pass
+    def __init__(self, message: str, code: str = "provider_error"):
+        super().__init__(redact(message))
+        self.code = code
 
 
 class BaseProvider(ABC):
@@ -70,12 +73,12 @@ class OllamaProvider(BaseProvider):
             response.raise_for_status()
             return [item["name"] for item in response.json().get("models", [])]
         except Exception as exc:
-            raise ProviderError(redact(f"Ollama is unavailable: {exc}")) from exc
+            raise ProviderError(f"Ollama is unavailable: {exc}", "provider_unreachable") from exc
 
     def validate(self) -> None:
         models = self.available_models()
         if self.model not in models:
-            raise ProviderError(f"Ollama model {self.model!r} is not installed. Available: {', '.join(models) or 'none'}")
+            raise ProviderError(f"Ollama model {self.model!r} is not installed. Available: {', '.join(models) or 'none'}", "model_not_found")
 
     def _chat(self, messages: list[dict[str, str]], config: SamplingConfig, *, json_output: bool = False) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -112,11 +115,11 @@ class OllamaProvider(BaseProvider):
                 except Exception as exc:
                     errors.append(redact(f"sample {index + 1}: {exc}"))
             if not outputs:
-                raise ProviderError("; ".join(errors) or "Ollama returned no responses.")
+                raise ProviderError("; ".join(errors) or "Ollama returned no responses.", "invalid_response")
             verification = None
             try:
                 verify_prompt = (
-                    "Independently assess the answer. Return JSON with verdict "
+                    "Independently check the answer from scratch; do not assume or repeat its conclusion. Return JSON with verdict "
                     "(supported|uncertain|contradicted), confidence from 0 to 1, reason, "
                     f"and claims. Question: {example.question}\nAnswer: {outputs[0]}"
                 )
@@ -130,15 +133,21 @@ class OllamaProvider(BaseProvider):
                 provider_metadata={
                     "execution_mode": "live", "provider": "ollama", "model": self.model,
                     "sampling": config.model_dump(), "partial_errors": errors,
-                    "self_verification": verification, "retry_count": 0,
+                    "self_verification": verification, "self_verification_raw": raw_verify.get("message", {}).get("content") if verification is not None else None,
+                    "self_verification_prompt_version": SELF_VERIFICATION_PROMPT_VERSION,
+                    "self_verification_temperature": config.temperature,
+                    "self_verification_max_tokens": config.max_tokens, "retry_count": 0,
                 },
             )
         except Exception as exc:
             return GenerationRecord(
                 response="", sampled_responses=outputs, token_usage=usage,
                 latency_ms=(time.perf_counter() - started) * 1000,
-                provider_metadata={"execution_mode": "live", "provider": "ollama", "model": self.model},
                 error=redact(str(exc)),
+                provider_metadata={
+                    "execution_mode": "live", "provider": "ollama", "model": self.model,
+                    "error_code": exc.code if isinstance(exc, ProviderError) else ("timeout" if isinstance(exc, httpx.TimeoutException) else "provider_error"),
+                },
             )
 
 
@@ -173,7 +182,7 @@ class OpenAICompatibleProvider(BaseProvider):
 
     def _request(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.base_url or not self.model:
-            raise ProviderError("OpenAI-compatible base URL and model must be configured.")
+            raise ProviderError("OpenAI-compatible base URL and model must be configured.", "invalid_configuration")
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -185,9 +194,18 @@ class OpenAICompatibleProvider(BaseProvider):
                 return response.json()
             except (httpx.TimeoutException, httpx.TransportError, httpx.HTTPStatusError) as exc:
                 last_error = exc
-                if attempt < self.retries:
+                status = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
+                retryable = status is None or status in {408, 429, 500, 502, 503, 504}
+                if attempt < self.retries and retryable:
                     time.sleep(min(2 ** attempt, 4))
-        raise ProviderError(redact(f"OpenAI-compatible request failed after {self.retries + 1} attempts: {last_error}"))
+                    continue
+                break
+        code = "timeout" if isinstance(last_error, httpx.TimeoutException) else (
+            "rate_limited" if isinstance(last_error, httpx.HTTPStatusError) and last_error.response.status_code == 429 else
+            "authentication_failed" if isinstance(last_error, httpx.HTTPStatusError) and last_error.response.status_code in {401, 403} else
+            "provider_error"
+        )
+        raise ProviderError(f"OpenAI-compatible request failed: {last_error}", code)
 
     def generate(self, example: DatasetExample, config: SamplingConfig) -> GenerationRecord:
         started = time.perf_counter()
@@ -229,7 +247,10 @@ class OpenAICompatibleProvider(BaseProvider):
         except Exception as exc:
             return GenerationRecord(
                 response="", sampled_responses=[], latency_ms=(time.perf_counter() - started) * 1000,
-                provider_metadata={"execution_mode": "live", "provider": "openai_compatible", "model": self.model},
+                provider_metadata={
+                    "execution_mode": "live", "provider": "openai_compatible", "model": self.model,
+                    "error_code": exc.code if isinstance(exc, ProviderError) else ("timeout" if isinstance(exc, httpx.TimeoutException) else "provider_error"),
+                },
                 error=redact(str(exc)),
             )
 

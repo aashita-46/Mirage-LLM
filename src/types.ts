@@ -47,7 +47,9 @@ export type ExampleResult = {
     correct?: boolean; score?: number; exact_match?: number; token_f1?: number;
     method: string; reason: string; error_type: string; automated_label?: boolean;
     human_label?: boolean; human_override_at?: string; human_note?: string;
+    human_override_history?: Array<Record<string,unknown>>;
   };
+  risk_trace?: Record<string,unknown>;
   failure_types: string[]; trace: Record<string, unknown>; error_state?: string;
 };
 export type AggregateMetrics = {
@@ -60,6 +62,7 @@ export type AggregateMetrics = {
   risk_coverage: {coverage:number;risk_threshold:number;selective_accuracy:number;error_rate:number;review_rate:number;remaining_errors:number}[];
   signal_comparison: {signal:string;coverage:number;auroc?:number;auprc?:number;ece?:number;brier?:number}[];
   warnings: string[];
+  metric_status?: Record<string,{available:boolean;reason?:string}>;
 };
 export type ExperimentSummary = {
   experiment_id: string; experiment_name: string; creation_time: string; state: string;
@@ -71,6 +74,7 @@ export type ExperimentRecord = {
   completed_time?: string; state: string; dataset: Record<string, unknown>;
   model: {provider:string;model:string;version?:string;mode:string;capabilities:ProviderCapabilities};
   config: Record<string, unknown>; results: ExampleResult[]; aggregates?: AggregateMetrics;
+  configuration_fingerprint?: string; provenance?: Record<string,unknown>;
 };
 
 export type Analysis = {

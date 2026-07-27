@@ -18,6 +18,9 @@ from api.core import (
     semantic_clusters,
     token_f1,
     export_experiment,
+    entropy_from_clusters,
+    combine_risk,
+    SignalValues,
 )
 from api.index import app
 
@@ -48,6 +51,16 @@ def test_token_f1():
 def test_numerical_tolerance():
     assert numeric_match("The result is 100.5", "100", 0.01) is True
     assert numeric_match("The result is 105", "100", 0.01) is False
+    assert numeric_match("It is 1.5%", "1.5", 0.01) is False
+    assert numeric_match("It is 5 km", "5 m", 0.01) is False
+    assert numeric_match("It is 1e3", "1000", 0.01) is True
+
+
+def test_invalid_signals_are_unavailable_not_zero():
+    assert entropy_from_clusters([], 1) is None
+    risk, contributions, trace = combine_risk(SignalValues(), {"semantic_entropy": 1})
+    assert risk is None and contributions == {}
+    assert trace["warnings"]
 
 
 def test_semantic_cluster_schema_and_method():
@@ -116,6 +129,9 @@ def test_human_override_preserves_original(tmp_path: Path):
     ]
     scores = [float(x.signals.semantic_entropy) for x in rows]
     assert semantic["auroc"] == roc_auc(labels, scores)
+    twice = store.override(record.experiment_id, target.example_id, bool(original), "second review", "reviewer-2")
+    changed_twice = next(x for x in twice.results if x.example_id == target.example_id)
+    assert len(changed_twice.correctness.human_override_history) == 2
 
 
 def test_csv_export_uses_effective_human_label():

@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from typing import Any
 
-from api.core import DatasetManifest, normalise_text
+from api.core import DatasetManifest, dataset_fingerprint, normalise_text
 from api.semantics import cluster_responses
 
 
@@ -51,6 +51,10 @@ def dataset_report(manifest: DatasetManifest, similarity_threshold: float = .92)
     verified = [item for item in examples if item.verification_status == "verified"]
     return {
         "dataset": manifest.name, "version": manifest.version,
+        "dataset_fingerprint": dataset_fingerprint(manifest),
+        "source_revisions": manifest.source_revisions,
+        "build_script_version": manifest.build_script_version,
+        "build_timestamp": manifest.build_timestamp,
         "total_examples": len(examples), "verified_examples": len(verified),
         "pending_examples": len(examples) - len(verified),
         "domain_distribution": dict(Counter(item.domain for item in examples)),

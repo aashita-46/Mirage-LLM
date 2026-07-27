@@ -18,6 +18,7 @@ export const api = {
   health: () => request<{status:string;mode:string;schema_version:string}>("/api/v1/health"),
   system: () => request<Record<string,unknown>>("/api/v1/system"),
   models: () => request<{models:ProviderModel[]}>("/api/v1/models"),
+  metrics: () => request<{metric_versions:Record<string,string>;metrics:Record<string,Record<string,unknown>>}>("/api/v1/metrics"),
   analyse: (question:string, reference_answer:string, sample_count:number, temperature:number) =>
     post<Analysis>("/api/v1/analyse",{question,reference_answer:reference_answer||null,sample_count,temperature,top_p:.9}),
   datasets: () => request<{datasets:DatasetSummary[]}>("/api/v1/datasets"),

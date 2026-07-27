@@ -190,7 +190,8 @@ function CalibrationPage({record}:{record:ExperimentRecord|null}) {
 
 function ThresholdPanel({metrics}:{metrics:AggregateMetrics}) {
   const [target,setTarget]=useState(.9);
-  const point=metrics.risk_coverage.find(x=>x.selective_accuracy>=target)??metrics.risk_coverage[0];
+  const eligible=metrics.risk_coverage.filter(x=>x.selective_accuracy>=target);
+  const point=eligible.length?eligible.reduce((best,row)=>row.coverage>best.coverage?row:best):undefined;
   return <section className="panel threshold-panel"><header><div><span className="eyebrow">HUMAN REVIEW POLICY</span><h3>Target selective accuracy</h3></div><strong>{pct(target,0)}</strong></header><input type="range" min=".5" max="1" step=".01" value={target} onChange={e=>setTarget(+e.target.value)}/>{point?<div className="metric-grid"><Metric label="Automation coverage" value={pct(point.coverage)} note="Examples accepted"/><Metric label="Review rate" value={pct(point.review_rate)} note="Examples escalated"/><Metric label="Selective accuracy" value={pct(point.selective_accuracy)} note="Accuracy among accepted"/><Metric label="Remaining errors" value={String(point.remaining_errors)} note="Within accepted examples"/></div>:<p>No valid threshold is available.</p>}</section>;
 }
 
@@ -264,7 +265,10 @@ function Page({eyebrow,title,intro,children}:{eyebrow:string;title:string;intro:
 function Empty({title,copy}:{title:string;copy:string}){return <div className="empty"><FlaskConical/><h3>{title}</h3><p>{copy}</p></div>}
 function ErrorState({message}:{message:string}){return <div className="error-state"><XCircle/><div><b>Evaluation stage failed</b><p>{message}</p></div></div>}
 function Warnings({warnings}:{warnings:string[]}){return <>{warnings.map(x=><div className="warning-copy panel" key={x}><AlertTriangle/>{x}</div>)}</>}
-function MetricGrid({metrics}:{metrics:AggregateMetrics}){return <div className="metric-grid"><Metric label="Accuracy" value={pct(metrics.accuracy)} note={`${metrics.labelled_examples} labelled examples`}/><Metric label="AUROC" value={num(metrics.auroc)} note="Incorrectness is positive class"/><Metric label="AUPRC" value={num(metrics.auprc)} note="Precision-recall discrimination"/><Metric label="ECE" value={num(metrics.ece)} note="Risk versus observed error"/><Metric label="Brier" value={num(metrics.brier)} note="Lower is better"/><Metric label="p95 latency" value={metrics.p95_latency_ms==null?"N/A":`${metrics.p95_latency_ms.toFixed(0)} ms`} note="Cached provider metadata"/></div>}
+function MetricGrid({metrics}:{metrics:AggregateMetrics}){
+  const reason=(name:string,fallback:string)=>metrics.metric_status?.[name]?.available===false?metrics.metric_status[name].reason??"Unavailable":fallback;
+  return <div className="metric-grid"><Metric label="Accuracy" value={pct(metrics.accuracy)} note={reason("accuracy",`${metrics.labelled_examples} labelled examples`)}/><Metric label="AUROC" value={num(metrics.auroc)} note={reason("auroc","Higher means better error ranking; it does not establish truth")}/><Metric label="AUPRC" value={num(metrics.auprc)} note={reason("auprc","Incorrectness is the positive class")}/><Metric label="ECE" value={num(metrics.ece)} note={reason("calibration","Lower is better; dataset-conditional calibration")}/><Metric label="Brier" value={num(metrics.brier)} note={reason("calibration","Lower is better; bounded error risk")}/><Metric label="p95 latency" value={metrics.p95_latency_ms==null?"N/A":`${metrics.p95_latency_ms.toFixed(0)} ms`} note="Provider-recorded latency"/></div>
+}
 function Reliability({metrics}:{metrics:AggregateMetrics}){return <article className="panel chart-card"><span className="eyebrow">RELIABILITY DIAGRAM</span><h3>Predicted risk vs observed error</h3><ResponsiveContainer width="100%" height={260}><BarChart data={metrics.reliability_bins}><CartesianGrid stroke="#242a36"/><XAxis dataKey="predicted" tickFormatter={x=>x.toFixed(1)}/><YAxis domain={[0,1]}/><Tooltip/><Legend/><Bar dataKey="predicted" fill="#7770ee"/><Bar dataKey="observed" fill="#61d7cd"/></BarChart></ResponsiveContainer></article>}
 function RiskCoverage({metrics}:{metrics:AggregateMetrics}){return <article className="panel chart-card"><span className="eyebrow">RISK–COVERAGE</span><h3>Accuracy after escalating risky outputs</h3><ResponsiveContainer width="100%" height={260}><LineChart data={metrics.risk_coverage}><CartesianGrid stroke="#242a36"/><XAxis dataKey="coverage" tickFormatter={x=>`${Math.round(x*100)}%`}/><YAxis domain={[0,1]} tickFormatter={x=>`${Math.round(x*100)}%`}/><Tooltip/><Line dataKey="selective_accuracy" stroke="#61d7cd" strokeWidth={2} dot={false}/><Line dataKey="error_rate" stroke="#ff7187" strokeWidth={2} dot={false}/></LineChart></ResponsiveContainer></article>}
 function SignalTable({metrics}:{metrics:AggregateMetrics}){return <div className="responsive-table"><table><thead><tr><th>Signal</th><th>Coverage</th><th>AUROC</th><th>AUPRC</th><th>ECE</th><th>Brier</th></tr></thead><tbody>{metrics.signal_comparison.map(x=><tr key={x.signal}><td>{titleCase(x.signal)}</td><td>{pct(x.coverage)}</td><td>{num(x.auroc)}</td><td>{num(x.auprc)}</td><td>{num(x.ece)}</td><td>{num(x.brier)}</td></tr>)}</tbody></table></div>}
@@ -276,21 +280,30 @@ function Builders() {
       name:"Ninad Naik",role:"Builder · Engineering & Product",
       image:"/builders/ninad-naik.jpg",
       linkedin:"https://www.linkedin.com/in/ninad-naik-274883262",
+      profileLabel:"LinkedIn",
       github:"https://github.com/ninadnaik03",
     },
     {
       name:"Aashita Jolly",role:"Builder · Research & Experience",
       image:"/builders/aashita-jolly.jpg",
       linkedin:"https://www.linkedin.com/in/aashita-jolly",
+      profileLabel:"LinkedIn",
       github:"https://github.com/aashita-46",
+    },
+    {
+      name:"Codex, apparently",role:"Contributor · Did the typing, still gets no equity",
+      image:"/builders/codex-contributor.png",
+      linkedin:"https://openai.com/codex/",
+      profileLabel:"OpenAI",
+      github:"https://github.com/openai",
     },
   ];
   return <section className="builders-section" aria-labelledby="builders-title">
     <div className="builders-intro"><span className="eyebrow">THE PEOPLE BEHIND MIRAGE</span><h2 id="builders-title">Built with curiosity.<br/><em>Measured with care.</em></h2><p>Mirage is shaped by a shared belief that model reliability should be observable, reproducible, and honest.</p></div>
     <div className="builder-grid">{builders.map((builder,index)=><article className="builder-card" key={builder.name}>
       <div className="builder-number">0{index+1}</div>
-      <div className="builder-photo"><img src={builder.image} alt={`${builder.name}, Mirage builder`} loading="lazy"/></div>
-      <div className="builder-copy"><span>{builder.role}</span><h3>{builder.name}</h3><div className="builder-links"><a href={builder.linkedin} target="_blank" rel="noreferrer" aria-label={`${builder.name} on LinkedIn`}><Linkedin/> LinkedIn</a><a href={builder.github} target="_blank" rel="noreferrer" aria-label={`${builder.name} on GitHub`}><Github/> GitHub</a></div></div>
+      <div className="builder-photo"><img src={builder.image} alt={`${builder.name}, Mirage contributor`} loading="lazy"/></div>
+      <div className="builder-copy"><span>{builder.role}</span><h3>{builder.name}</h3><div className="builder-links"><a href={builder.linkedin} target="_blank" rel="noreferrer" aria-label={`${builder.name} on ${builder.profileLabel}`}><Linkedin/> {builder.profileLabel}</a><a href={builder.github} target="_blank" rel="noreferrer" aria-label={`${builder.name} on GitHub`}><Github/> GitHub</a></div></div>
     </article>)}</div>
   </section>;
 }

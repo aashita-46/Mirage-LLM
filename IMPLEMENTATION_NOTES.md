@@ -81,3 +81,17 @@ GitHub publication and Vercel deployment were authorised after the local review.
 - Docker execution remains unverified because Docker Desktop is not running.
 - The official three-model, 200-example research configuration exists but is not
   claimed as completed.
+# Hardening iteration
+
+- Metric definitions and eligibility now come from a central registry; invalid
+  metrics remain null with an explicit reason.
+- Classification, calibration, risk-coverage, semantic-entropy and composite-risk
+  definitions were versioned after tie, missing-value and traceability changes.
+- Lexical and embedding clustering now use deterministic connected components.
+- Dataset-content and canonical configuration fingerprints are stored in new runs.
+- Human overrides are append-only and continue to preserve automated labels.
+- Bootstrap intervals store requested, valid and rejected resamples.
+- Official Findings/report output requires completed, live, non-demonstration runs;
+  research-v1 conclusions additionally require three 200-example model runs.
+- Existing pre-hardening experiments remain readable but are reported as legacy
+  provenance rather than silently upgraded.

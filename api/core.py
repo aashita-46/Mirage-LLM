@@ -11,6 +11,8 @@ import os
 import re
 import sqlite3
 import statistics
+import subprocess
+import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,10 +22,22 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 SCHEMA_VERSION = "2.0"
 METRIC_VERSIONS = {
-    "classification": "2.1",
-    "calibration": "2.0",
-    "risk_coverage": "2.0",
-    "semantic_entropy": "2.1",
+    "classification": "2.2",
+    "calibration": "2.1",
+    "risk_coverage": "2.1",
+    "semantic_entropy": "2.2",
+    "mirage_risk_score": "2.1",
+}
+METRIC_REGISTRY: dict[str, dict[str, Any]] = {
+    "accuracy": {"version": "2.2", "direction": "higher_is_better", "range": [0.0, 1.0], "minimum_samples": 1, "requires_binary_labels": True, "requires_both_classes": False, "description": "Fraction of effective correctness labels that are correct."},
+    "auroc": {"version": "2.1", "direction": "higher_is_better", "range": [0.0, 1.0], "minimum_samples": 2, "requires_binary_labels": True, "requires_both_classes": True, "description": "Pairwise ranking probability for incorrect versus correct examples; ties receive half credit."},
+    "auprc": {"version": "2.1", "direction": "higher_is_better", "range": [0.0, 1.0], "minimum_samples": 1, "requires_binary_labels": True, "requires_both_classes": False, "description": "Average precision for the incorrect class using tied-score thresholds."},
+    "ece": {"version": "2.1", "direction": "lower_is_better", "range": [0.0, 1.0], "minimum_samples": 1, "requires_binary_labels": True, "requires_both_classes": False, "description": "Weighted absolute difference between predicted error risk and observed error frequency in fixed-width bins."},
+    "brier": {"version": "2.1", "direction": "lower_is_better", "range": [0.0, 1.0], "minimum_samples": 1, "requires_binary_labels": True, "requires_both_classes": False, "description": "Mean squared error between bounded predicted risk and binary error labels."},
+    "negative_log_likelihood": {"version": "2.1", "direction": "lower_is_better", "range": [0.0, None], "minimum_samples": 1, "requires_binary_labels": True, "requires_both_classes": False, "description": "Binary log loss with probabilities clipped only for numerical stability."},
+    "semantic_entropy": {"version": "2.2", "direction": "higher_is_more_uncertain", "range": [0.0, 1.0], "minimum_samples": 2, "requires_binary_labels": False, "requires_both_classes": False, "description": "Normalised Shannon entropy over semantic response clusters."},
+    "numerical_variance": {"version": "2.1", "direction": "higher_is_more_uncertain", "range": [0.0, None], "minimum_samples": 2, "requires_binary_labels": False, "requires_both_classes": False, "description": "Population variance of extracted numeric answers; unavailable with fewer than two numeric responses."},
+    "mirage_risk_score": {"version": "2.1", "direction": "higher_is_more_error_risk", "range": [0.0, 1.0], "minimum_samples": 1, "requires_binary_labels": False, "requires_both_classes": False, "description": "Experimental weighted composite of available bounded uncertainty signals; not a probability unless calibrated out of sample."},
 }
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
@@ -96,6 +110,9 @@ class DatasetManifest(BaseModel):
     description: str
     license: str = "Repository demonstration data"
     demonstration: bool = True
+    source_revisions: dict[str, str] = Field(default_factory=dict)
+    build_script_version: str | None = None
+    build_timestamp: str | None = None
     examples: list[DatasetExample]
 
 
@@ -152,6 +169,7 @@ class EvaluatorConfig(BaseModel):
         default_factory=lambda: ["acceptable_answer", "normalised_exact_match", "token_f1"]
     )
     numeric_tolerance: float = Field(default=0.01, ge=0)
+    partial_credit_threshold: float = Field(default=0.78, ge=0, le=1)
     llm_judge_enabled: bool = False
 
 
@@ -223,6 +241,8 @@ class CorrectnessResult(BaseModel):
     human_label: bool | None = None
     human_override_at: str | None = None
     human_note: str | None = None
+    human_override_history: list[dict[str, Any]] = Field(default_factory=list)
+    partial_credit_threshold: float | None = None
 
 
 class SignalValues(BaseModel):
@@ -253,6 +273,7 @@ class ExampleResult(BaseModel):
     signals: SignalValues
     predicted_risk: float | None
     risk_contributions: dict[str, float]
+    risk_trace: dict[str, Any] = Field(default_factory=dict)
     correctness: CorrectnessResult
     failure_types: list[str]
     retrieval_context: list[dict[str, Any]] = Field(default_factory=list)
@@ -282,6 +303,7 @@ class AggregateMetrics(BaseModel):
     risk_coverage: list[dict[str, float]]
     signal_comparison: list[dict[str, Any]]
     warnings: list[str]
+    metric_status: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 class ExperimentRecord(BaseModel):
@@ -299,10 +321,13 @@ class ExperimentRecord(BaseModel):
     aggregates: AggregateMetrics | None = None
     metric_versions: dict[str, str] = Field(default_factory=lambda: dict(METRIC_VERSIONS))
     research_analysis: dict[str, Any] = Field(default_factory=dict)
+    configuration_fingerprint: str | None = None
+    provenance: dict[str, Any] = Field(default_factory=dict)
 
 
 def normalise_text(value: str) -> str:
-    value = value.casefold().strip()
+    value = unicodedata.normalize("NFKC", value).casefold().strip()
+    value = value.replace("’", "'").replace("“", '"').replace("”", '"')
     value = re.sub(r"(?<=\d),(?=\d)", "", value)
     value = re.sub(r"[^\w\s.\-]", " ", value)
     value = re.sub(r"\s+", " ", value)
@@ -324,7 +349,7 @@ def token_f1(prediction: str, reference: str) -> float:
 
 
 def extract_number(value: str) -> float | None:
-    match = re.search(r"-?\d+(?:,\d{3})*(?:\.\d+)?", value)
+    match = re.search(r"-?(?:\d+(?:,\d{3})*|\d*\.\d+)(?:[eE][+-]?\d+)?", value)
     return float(match.group(0).replace(",", "")) if match else None
 
 
@@ -332,6 +357,14 @@ def numeric_match(prediction: str, reference: str, tolerance: float) -> bool | N
     pred, ref = extract_number(prediction), extract_number(reference)
     if pred is None or ref is None:
         return None
+    pred_pct, ref_pct = "%" in prediction, "%" in reference
+    if pred_pct != ref_pct:
+        return False
+    units = r"\b(km|m|cm|mm|kg|g|mg|lb|mph|km/h|°c|°f|usd|eur)\b"
+    pred_unit = re.search(units, prediction.casefold())
+    ref_unit = re.search(units, reference.casefold())
+    if pred_unit and ref_unit and pred_unit.group(1) != ref_unit.group(1):
+        return False
     allowed = max(tolerance, abs(ref) * tolerance)
     return abs(pred - ref) <= allowed
 
@@ -339,25 +372,38 @@ def numeric_match(prediction: str, reference: str, tolerance: float) -> bool | N
 def correctness(example: DatasetExample, answer: str, config: EvaluatorConfig) -> CorrectnessResult:
     candidates = [x for x in [example.reference_answer, *example.acceptable_answers] if x]
     answer_norm = normalise_text(answer)
-    if example.unanswerable:
-        markers = ("unknown", "cannot be determined", "unanswerable", "no such", "not enough information", "false premise")
-        ok = any(marker in answer_norm for marker in markers)
+    if example.answerability in {"unanswerable", "ambiguous"} or example.unanswerable:
+        valid_markers = ("cannot be determined", "insufficient information", "not enough information", "does not provide enough", "no valid answer")
+        evasive_only = answer_norm in {"i am not sure", "maybe", "it depends", "unknown"}
+        ok = any(marker in answer_norm for marker in valid_markers) and not evasive_only
         return CorrectnessResult(
             correct=ok, score=float(ok), exact_match=None, token_f1=None,
             method="unanswerable_marker", reason="Checked for an explicit abstention or premise rejection.",
             error_type="none" if ok else "unanswerable_question_answered", automated_label=ok,
+            partial_credit_threshold=config.partial_credit_threshold,
+        )
+    if example.answerability == "false_premise":
+        rejection = any(marker in answer_norm for marker in ("false premise", "premise is incorrect", "did not", "does not exist", "no such"))
+        invented = any(normalise_text(candidate) in answer_norm for candidate in candidates) if candidates else False
+        ok = rejection and not invented
+        return CorrectnessResult(
+            correct=ok, score=float(ok), exact_match=None, token_f1=None,
+            method="false_premise_rejection",
+            reason="Required an explicit rejection of the premise without inventing the requested answer.",
+            error_type="none" if ok else "false_premise_accepted", automated_label=ok,
+            partial_credit_threshold=config.partial_credit_threshold,
         )
     exact = any(answer_norm == normalise_text(candidate) for candidate in candidates)
     alias = any(normalise_text(candidate) in answer_norm for candidate in candidates)
     f1 = max((token_f1(answer, candidate) for candidate in candidates), default=0.0)
     numeric = any(numeric_match(answer, candidate, config.numeric_tolerance) is True for candidate in candidates)
-    ok = exact or alias or numeric or f1 >= 0.78
+    ok = exact or alias or numeric or f1 >= config.partial_credit_threshold
     error_type = "none" if ok else classify_error(answer, example.reference_answer or "")
     return CorrectnessResult(
         correct=ok, score=max(float(exact or alias or numeric), f1), exact_match=float(exact),
         token_f1=f1, method="deterministic_composite",
         reason="Evaluated with aliases, normalised matching, token F1, and numerical tolerance.",
-        error_type=error_type, automated_label=ok,
+        error_type=error_type, automated_label=ok, partial_credit_threshold=config.partial_credit_threshold,
     )
 
 
@@ -380,26 +426,20 @@ def lexical_similarity(a: str, b: str) -> float:
 
 
 def semantic_clusters(responses: list[str], threshold: float = 0.42) -> list[SemanticCluster]:
-    groups: list[list[int]] = []
-    for index, response in enumerate(responses):
-        destination = next(
-            (group for group in groups if max(lexical_similarity(response, responses[i]) for i in group) >= threshold),
-            None,
-        )
-        (destination if destination is not None else groups.append([index]))
-        if destination is None:
-            continue
-        destination.append(index)
-    # The append expression above creates singleton groups; guard against duplication.
-    assigned = {i for group in groups for i in group}
-    groups.extend([[i] for i in range(len(responses)) if i not in assigned])
+    matrix = [[lexical_similarity(a, b) for b in responses] for a in responses]
+    linked = [[i == j or matrix[i][j] >= threshold for j in range(len(responses))] for i in range(len(responses))]
+    from api.semantics import connected_components
+    groups = connected_components(linked, responses)
     return [
         SemanticCluster(
             cluster_id=f"cluster_{idx + 1}",
             response_indices=group,
             responses=[responses[i] for i in group],
             size=len(group),
-            representative_answer=responses[group[0]],
+            representative_answer=min(
+                (responses[i] for i in group),
+                key=lambda text: (-sum(matrix[responses.index(text)][j] for j in group), normalise_text(text), text),
+            ),
             probability=len(group) / len(responses),
             evaluator_method="lexical_fallback_jaccard",
         )
@@ -407,14 +447,14 @@ def semantic_clusters(responses: list[str], threshold: float = 0.42) -> list[Sem
     ]
 
 
-def entropy_from_clusters(clusters: list[SemanticCluster], sample_count: int) -> float:
+def entropy_from_clusters(clusters: list[SemanticCluster], sample_count: int) -> float | None:
     if sample_count <= 1:
-        return 0.0
+        return None
     raw = -sum(c.probability * math.log(c.probability) for c in clusters if c.probability)
     return raw / math.log(sample_count)
 
 
-def consistency_signals(responses: list[str], clusters: list[SemanticCluster]) -> dict[str, float]:
+def consistency_signals(responses: list[str], clusters: list[SemanticCluster]) -> dict[str, float | None]:
     normalised = [normalise_text(x) for x in responses]
     concentration = max((c.probability for c in clusters), default=0.0)
     numbers = [n for n in (extract_number(x) for x in responses) if n is not None]
@@ -429,12 +469,12 @@ def consistency_signals(responses: list[str], clusters: list[SemanticCluster]) -
         "response_consistency": concentration,
         "exact_response_consistency": max(Counter(normalised).values(), default=0) / max(1, len(responses)),
         "answer_switch_rate": 1 - concentration,
-        "numerical_variance": statistics.pvariance(numbers) if len(numbers) > 1 else 0.0,
-        "entity_disagreement_rate": 1 - (len(entity_intersection) / max(1, len(entity_union))),
+        "numerical_variance": statistics.pvariance(numbers) if len(numbers) > 1 else None,
+        "entity_disagreement_rate": None if not entity_union else 1 - (len(entity_intersection) / len(entity_union)),
     }
 
 
-def combine_risk(signals: SignalValues, weights: dict[str, float]) -> tuple[float | None, dict[str, float]]:
+def combine_risk(signals: SignalValues, weights: dict[str, float]) -> tuple[float | None, dict[str, float], dict[str, Any]]:
     values = {
         "semantic_entropy": signals.semantic_entropy,
         "response_inconsistency": None if signals.response_consistency is None else 1 - signals.response_consistency,
@@ -445,9 +485,16 @@ def combine_risk(signals: SignalValues, weights: dict[str, float]) -> tuple[floa
     active = {name: (value, max(0.0, weights.get(name, 0.0))) for name, value in values.items() if value is not None and weights.get(name, 0) > 0}
     total = sum(weight for _, weight in active.values())
     if not active or total == 0:
-        return None, {}
+        return None, {}, {"version": METRIC_VERSIONS["mirage_risk_score"], "warnings": ["No enabled, available, positively weighted signals."], "raw_values": values, "configured_weights": weights, "effective_weights": {}}
     contributions = {name: value * weight / total for name, (value, weight) in active.items()}
-    return min(1.0, max(0.0, sum(contributions.values()))), contributions
+    effective = {name: weight / total for name, (_, weight) in active.items()}
+    return min(1.0, max(0.0, sum(contributions.values()))), contributions, {
+        "version": METRIC_VERSIONS["mirage_risk_score"], "enabled_signals": sorted(active),
+        "raw_values": values, "normalised_values": {name: value for name, (value, _) in active.items()},
+        "configured_weights": weights, "effective_weights": effective,
+        "direction": {name: "higher_is_more_error_risk" for name in active},
+        "contributions": contributions, "warnings": [],
+    }
 
 
 def roc_auc(labels: list[int], scores: list[float]) -> float | None:
@@ -476,7 +523,7 @@ def average_precision(labels: list[int], scores: list[float]) -> float | None:
 
 
 def calibration(labels: list[int], scores: list[float], bins: int = 10) -> tuple[float | None, float | None, float | None, list[dict[str, Any]]]:
-    if not labels:
+    if not labels or len(labels) != len(scores) or any(not math.isfinite(score) or not 0 <= score <= 1 for score in scores):
         return None, None, None, []
     rows, ece = [], 0.0
     for index in range(bins):
@@ -495,17 +542,21 @@ def calibration(labels: list[int], scores: list[float], bins: int = 10) -> tuple
 
 
 def risk_coverage(labels: list[int], risks: list[float]) -> list[dict[str, float]]:
-    if not labels:
+    if not labels or len(labels) != len(risks):
         return []
-    ordered = sorted(zip(risks, labels))
+    ordered = sorted(enumerate(zip(risks, labels)), key=lambda item: (item[1][0], item[0]))
     rows = []
+    rows.append({
+        "coverage": 0.0, "risk_threshold": 0.0, "selective_accuracy": 1.0,
+        "error_rate": 0.0, "review_rate": 1.0, "remaining_errors": 0.0,
+    })
     for accepted in range(1, len(ordered) + 1):
         subset = ordered[:accepted]
-        errors = sum(label for _, label in subset)
+        errors = sum(label for _, (_, label) in subset)
         coverage = accepted / len(ordered)
         rows.append({
             "coverage": coverage,
-            "risk_threshold": subset[-1][0],
+            "risk_threshold": subset[-1][1][0],
             "selective_accuracy": 1 - errors / accepted,
             "error_rate": errors / accepted,
             "review_rate": 1 - coverage,
@@ -636,14 +687,14 @@ def evaluate_example(example: DatasetExample, config: ExperimentConfig, provider
         numerical_variance=consistency["numerical_variance"],
         entity_disagreement_rate=consistency["entity_disagreement_rate"],
     )
-    predicted_risk, contributions = combine_risk(signals, config.signals.weights)
+    predicted_risk, contributions, risk_trace = combine_risk(signals, config.signals.weights)
     judged = correctness(example, raw.response, config.evaluator)
     return ExampleResult(
         example_id=example.id, question=example.question, reference_answer=example.reference_answer,
         acceptable_answers=example.acceptable_answers, domain=example.domain, difficulty=example.difficulty,
         source=example.source, tags=example.tags, raw_generation=raw, semantic_clusters=clusters,
         verification=verification, signals=signals, predicted_risk=predicted_risk,
-        risk_contributions=contributions, correctness=judged,
+        risk_contributions=contributions, risk_trace=risk_trace, correctness=judged,
         failure_types=failure_types(judged, predicted_risk, signals),
         trace={
             "schema_version": SCHEMA_VERSION,
@@ -695,6 +746,12 @@ def aggregate(results: list[ExampleResult]) -> AggregateMetrics:
     warnings = []
     if len(valid) < 30:
         warnings.append("Calibration metrics are unstable with fewer than 30 labelled examples.")
+    status = {
+        "accuracy": {"available": bool(labels), "reason": None if labels else "No labelled, risk-eligible examples."},
+        "auroc": {"available": len(set(labels)) == 2, "reason": None if len(set(labels)) == 2 else "Requires both correct and incorrect classes."},
+        "auprc": {"available": bool(labels) and any(labels), "reason": None if labels and any(labels) else "Requires at least one incorrect example."},
+        "calibration": {"available": bool(labels), "reason": None if labels else "Requires bounded risks and correctness labels."},
+    }
     return AggregateMetrics(
         total_examples=len(results), labelled_examples=len(valid),
         failed_examples=sum(bool(r.error_state) for r in results),
@@ -710,8 +767,30 @@ def aggregate(results: list[ExampleResult]) -> AggregateMetrics:
         average_output_tokens=statistics.mean([r.raw_generation.token_usage.get("output", 0) for r in results]) if results else None,
         total_estimated_cost=sum(r.raw_generation.estimated_cost or 0 for r in results),
         reliability_bins=bins, risk_coverage=risk_coverage(labels, risks),
-        signal_comparison=comparisons, warnings=warnings,
+        signal_comparison=comparisons, warnings=warnings, metric_status=status,
     )
+
+
+def dataset_fingerprint(manifest: DatasetManifest) -> str:
+    payload = manifest.model_dump(exclude={"build_timestamp"})
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+
+
+def configuration_fingerprint(config: ExperimentConfig, dataset_sha256: str) -> str:
+    payload = {
+        "fingerprint_version": "1",
+        "schema_version": SCHEMA_VERSION,
+        "metric_versions": METRIC_VERSIONS,
+        "dataset_sha256": dataset_sha256,
+        "config": config.model_dump(mode="json"),
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+
+
+def git_provenance() -> dict[str, Any]:
+    def run(*args: str) -> str:
+        return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=False).stdout.strip()
+    return {"commit": run("rev-parse", "HEAD") or None, "dirty": bool(run("status", "--porcelain"))}
 
 
 def run_experiment(config: ExperimentConfig, git_commit: str | None = None, provider: Any | None = None) -> ExperimentRecord:
@@ -721,7 +800,8 @@ def run_experiment(config: ExperimentConfig, git_commit: str | None = None, prov
         provider = provider_for(config.provider, config.model)
     identity = {
         "schema": SCHEMA_VERSION,
-        "dataset": [manifest.name, manifest.version],
+        "dataset": [manifest.name, manifest.version, dataset_fingerprint(manifest)],
+        "metric_versions": METRIC_VERSIONS,
         "config": config.model_dump(),
     }
     experiment_id = stable_id("exp", identity)
@@ -742,9 +822,12 @@ def run_experiment(config: ExperimentConfig, git_commit: str | None = None, prov
         dataset={
             "name": manifest.name, "version": manifest.version, "size": len(manifest.examples),
             "demonstration": manifest.demonstration, "description": manifest.description,
+            "fingerprint": dataset_fingerprint(manifest),
         },
         model=provider.info, config=config, git_commit=git_commit,
         results=results, aggregates=aggregate(results),
+        configuration_fingerprint=configuration_fingerprint(config, dataset_fingerprint(manifest)),
+        provenance=git_provenance(),
     )
     logger.info("experiment.completed id=%s state=%s failed=%d", experiment_id, state, failed)
     return record
@@ -776,15 +859,30 @@ class ExperimentStore:
             """)
             db.execute("""
                 CREATE TABLE IF NOT EXISTS human_overrides (
+                    override_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     experiment_id TEXT NOT NULL,
                     example_id TEXT NOT NULL,
                     original_label INTEGER,
                     human_label INTEGER NOT NULL,
                     note TEXT,
-                    created_at TEXT NOT NULL,
-                    PRIMARY KEY (experiment_id, example_id)
+                    reviewer TEXT,
+                    created_at TEXT NOT NULL
                 )
             """)
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(human_overrides)").fetchall()}
+            if "override_id" not in columns:
+                db.execute("ALTER TABLE human_overrides RENAME TO human_overrides_legacy")
+                db.execute("""CREATE TABLE human_overrides (
+                    override_id INTEGER PRIMARY KEY AUTOINCREMENT, experiment_id TEXT NOT NULL,
+                    example_id TEXT NOT NULL, original_label INTEGER, human_label INTEGER NOT NULL,
+                    note TEXT, reviewer TEXT, created_at TEXT NOT NULL)""")
+                db.execute("""INSERT INTO human_overrides
+                    (experiment_id, example_id, original_label, human_label, note, reviewer, created_at)
+                    SELECT experiment_id, example_id, original_label, human_label, note, NULL, created_at
+                    FROM human_overrides_legacy""")
+                db.execute("DROP TABLE human_overrides_legacy")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_experiments_state_created ON experiments(state, created_at)")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_overrides_experiment_example ON human_overrides(experiment_id, example_id)")
             db.execute("INSERT OR IGNORE INTO schema_migrations VALUES (?, ?)", (SCHEMA_VERSION, utc_now()))
 
     def save(self, record: ExperimentRecord) -> None:
@@ -810,7 +908,7 @@ class ExperimentStore:
             cursor = db.execute("DELETE FROM experiments WHERE experiment_id=?", (experiment_id,))
         return bool(cursor.rowcount)
 
-    def override(self, experiment_id: str, example_id: str, human_label: bool, note: str | None) -> ExperimentRecord:
+    def override(self, experiment_id: str, example_id: str, human_label: bool, note: str | None, reviewer: str | None = None) -> ExperimentRecord:
         record = self.get(experiment_id)
         if not record:
             raise KeyError(experiment_id)
@@ -818,6 +916,11 @@ class ExperimentStore:
         if not result:
             raise KeyError(example_id)
         timestamp = utc_now()
+        history = {
+            "human_label": human_label, "note": note, "reviewer": reviewer,
+            "timestamp": timestamp,
+        }
+        result.correctness.human_override_history.append(history)
         result.correctness.human_label = human_label
         result.correctness.human_override_at = timestamp
         result.correctness.human_note = note
@@ -826,10 +929,12 @@ class ExperimentStore:
         self.save(record)
         with self.connect() as db:
             db.execute(
-                "INSERT OR REPLACE INTO human_overrides VALUES (?, ?, ?, ?, ?, ?)",
+                """INSERT INTO human_overrides
+                   (experiment_id, example_id, original_label, human_label, note, reviewer, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (experiment_id, example_id,
                  None if result.correctness.automated_label is None else int(result.correctness.automated_label),
-                 int(human_label), note, timestamp),
+                 int(human_label), note, reviewer, timestamp),
             )
         return record
 
@@ -840,7 +945,7 @@ def export_experiment(record: ExperimentRecord, format_name: str) -> tuple[str, 
     if format_name == "csv":
         stream = io.StringIO()
         writer = csv.writer(stream)
-        writer.writerow(["example_id", "question", "response", "correct", "risk", "domain", "failure_types"])
+        writer.writerow(["example_id", "question", "response", "automated_correct", "human_correct", "effective_correct", "risk", "domain", "failure_types", "provider_error", "experiment_id", "configuration_fingerprint", "dataset_fingerprint", "state"])
         for row in record.results:
             effective_label = (
                 row.correctness.human_label
@@ -848,13 +953,17 @@ def export_experiment(record: ExperimentRecord, format_name: str) -> tuple[str, 
                 else row.correctness.correct
             )
             writer.writerow([
-                row.example_id, row.question, row.raw_generation.response, effective_label,
-                row.predicted_risk, row.domain, "|".join(row.failure_types),
+                row.example_id, row.question, row.raw_generation.response, row.correctness.automated_label,
+                row.correctness.human_label, effective_label, row.predicted_risk, row.domain,
+                "|".join(row.failure_types), row.error_state, record.experiment_id,
+                record.configuration_fingerprint, record.dataset.get("fingerprint"), record.state,
             ])
         return stream.getvalue(), "text/csv"
     markdown = [
         f"# {record.experiment_name}",
         "", f"- Experiment ID: `{record.experiment_id}`",
+        f"- Configuration fingerprint: `{record.configuration_fingerprint or 'unavailable'}`",
+        f"- Dataset fingerprint: `{record.dataset.get('fingerprint', 'unavailable')}`",
         f"- Dataset: {record.dataset['name']} {record.dataset['version']}",
         f"- State: {record.state}", f"- Schema: {record.schema_version}", "",
         "## Aggregate metrics", "",

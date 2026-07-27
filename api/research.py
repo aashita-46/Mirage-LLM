@@ -15,6 +15,9 @@ from api.core import (
     load_manifest,
     roc_auc,
     average_precision,
+    configuration_fingerprint,
+    dataset_fingerprint,
+    git_provenance,
     stable_id,
     utc_now,
 )
@@ -32,10 +35,18 @@ from api.statistics import (
 
 
 def experiment_identity(config: ExperimentConfig, dataset_version: str) -> str:
-    return stable_id("exp", {
-        "schema": SCHEMA_VERSION, "dataset": [config.dataset_name, dataset_version],
-        "config": config.model_dump(),
-    })
+    manifest = load_manifest(config.dataset_name)
+    fingerprint = dataset_fingerprint(manifest)
+    return stable_id("exp", {"fingerprint": configuration_fingerprint(config, fingerprint)})
+
+
+def configuration_diff(stored: ExperimentConfig, requested: ExperimentConfig) -> list[dict[str, Any]]:
+    def flatten(value: Any, prefix: str = "") -> dict[str, Any]:
+        if isinstance(value, dict):
+            return {key: nested for name, item in value.items() for key, nested in flatten(item, f"{prefix}.{name}" if prefix else name).items()}
+        return {prefix: value}
+    left, right = flatten(stored.model_dump(mode="json")), flatten(requested.model_dump(mode="json"))
+    return [{"field": key, "stored": left.get(key), "requested": right.get(key)} for key in sorted(left.keys() | right.keys()) if left.get(key) != right.get(key)]
 
 
 def run_resumable(
@@ -50,7 +61,9 @@ def run_resumable(
     experiment_id = experiment_identity(config, manifest.version)
     existing = store.get(experiment_id) if resume or rerun_failed else None
     if existing and existing.config.model_dump() != config.model_dump():
-        raise ValueError("Stored experiment configuration is stale and cannot be mixed with this run.")
+        differences = configuration_diff(existing.config, config)
+        details = "; ".join(f"{item['field']}: {item['stored']!r} -> {item['requested']!r}" for item in differences)
+        raise ValueError(f"Stored experiment configuration is stale: {details}")
     active_provider = provider or provider_for(config.provider, config.model)
     examples = [
         item for item in manifest.examples
@@ -67,9 +80,12 @@ def run_resumable(
         dataset={
             "name": manifest.name, "version": manifest.version, "size": len(examples),
             "demonstration": manifest.demonstration, "description": manifest.description,
+            "fingerprint": dataset_fingerprint(manifest),
         },
         model=active_provider.info, config=config, git_commit=git_commit, results=[],
         metric_versions=dict(METRIC_VERSIONS),
+        configuration_fingerprint=configuration_fingerprint(config, dataset_fingerprint(manifest)),
+        provenance=git_provenance(),
     )
     record.state = "running"
     record.results = list(completed.values())
@@ -182,12 +198,14 @@ def _calibration_result(labels: list[int], scores: list[float], parameters: dict
 def findings_for_group(records: list[ExperimentRecord], group: str) -> dict[str, Any]:
     eligible = [
         record for record in records
-        if record.config.experiment_group == group and record.model.mode == "live" and record.aggregates
+        if record.config.experiment_group == group and record.model.mode == "live"
+        and record.aggregates and record.state == "completed" and not record.dataset.get("demonstration")
     ]
     if not eligible:
         return {
             "experiment_group": group, "available": False,
-            "reason": "No genuine live experiment records exist for this group.",
+            "reason": "No completed, non-demonstration live experiment records exist for this group.",
+            "requirements": ["state=completed", "model.mode=live", "dataset.demonstration=false", "aggregate metrics present"],
             "experiments": [],
         }
     strongest = max(eligible, key=lambda item: item.aggregates.accuracy or -1)
@@ -202,6 +220,7 @@ def findings_for_group(records: list[ExperimentRecord], group: str) -> dict[str,
     )
     return {
         "experiment_group": group, "available": True,
+        "result_status": "official" if group == "research-v1" else "preliminary",
         "dataset": eligible[0].dataset, "schema_version": eligible[0].schema_version,
         "experiment_ids": [item.experiment_id for item in eligible],
         "executive_findings": {

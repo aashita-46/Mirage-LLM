@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field, ValidationError
 
 from api.core import (
-    DATASET_DIR, SCHEMA_VERSION,
+    DATASET_DIR, SCHEMA_VERSION, METRIC_REGISTRY, METRIC_VERSIONS,
     CachedDemoProvider,
     DatasetManifest,
     ExperimentConfig,
@@ -95,6 +95,11 @@ def health() -> dict[str, Any]:
         "schema_version": SCHEMA_VERSION,
         "database": "sqlite",
     }
+
+
+@app.get("/api/v1/metrics")
+def metrics_registry() -> dict[str, Any]:
+    return {"metric_versions": METRIC_VERSIONS, "metrics": METRIC_REGISTRY}
 
 
 @app.get("/api/v1/system")

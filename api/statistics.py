@@ -9,15 +9,36 @@ from typing import Any
 METRIC_VERSION = "2.1"
 
 
+def _interval_payload(
+    estimate: float | None, measured: list[float], requested: int, seed: int,
+    confidence: float, sample_count: int,
+) -> dict[str, Any]:
+    measured.sort()
+    alpha = (1 - confidence) / 2
+    low = measured[max(0, int(alpha * len(measured)))] if measured else None
+    high = measured[min(len(measured) - 1, max(0, math.ceil((1 - alpha) * len(measured)) - 1))] if measured else None
+    warnings = []
+    if sample_count < 30:
+        warnings.append("Bootstrap interval is unstable with fewer than 30 eligible examples.")
+    if len(measured) < requested:
+        warnings.append("Some resamples were rejected because the statistic was undefined.")
+    return {
+        "estimate": estimate, "low": low, "high": high, "confidence_level": confidence,
+        "requested_resamples": requested, "valid_resamples": len(measured),
+        "rejected_resamples": requested - len(measured), "seed": seed,
+        "method": "percentile_bootstrap", "eligible_samples": sample_count, "warnings": warnings,
+    }
+
+
 def bootstrap_ci(
     values: list[tuple[int, float]],
     metric: Callable[[list[int], list[float]], float | None],
     resamples: int = 1000,
     seed: int = 42,
     confidence: float = 0.95,
-) -> dict[str, float | int | None]:
+) -> dict[str, Any]:
     if not values:
-        return {"estimate": None, "low": None, "high": None, "valid_resamples": 0}
+        return _interval_payload(None, [], resamples, seed, confidence, 0)
     labels, scores = zip(*values)
     estimate = metric(list(labels), list(scores))
     rng, measured = random.Random(seed), []
@@ -26,13 +47,7 @@ def bootstrap_ci(
         sample = metric([labels[i] for i in indices], [scores[i] for i in indices])
         if sample is not None and math.isfinite(sample):
             measured.append(sample)
-    if not measured:
-        return {"estimate": estimate, "low": None, "high": None, "valid_resamples": 0}
-    measured.sort()
-    alpha = (1 - confidence) / 2
-    low = measured[max(0, int(alpha * len(measured)))]
-    high = measured[min(len(measured) - 1, int((1 - alpha) * len(measured)) - 1)]
-    return {"estimate": estimate, "low": low, "high": high, "valid_resamples": len(measured)}
+    return _interval_payload(estimate, measured, resamples, seed, confidence, len(values))
 
 
 def bootstrap_statistic(
@@ -41,9 +56,9 @@ def bootstrap_statistic(
     resamples: int = 1000,
     seed: int = 42,
     confidence: float = .95,
-) -> dict[str, float | int | None]:
+) -> dict[str, Any]:
     if not rows:
-        return {"estimate": None, "low": None, "high": None, "valid_resamples": 0}
+        return _interval_payload(None, [], resamples, seed, confidence, 0)
     estimate = statistic(rows)
     rng, values = random.Random(seed), []
     for _ in range(resamples):
@@ -51,16 +66,7 @@ def bootstrap_statistic(
         value = statistic(sample)
         if value is not None and math.isfinite(value):
             values.append(value)
-    values.sort()
-    if not values:
-        return {"estimate": estimate, "low": None, "high": None, "valid_resamples": 0}
-    alpha = (1 - confidence) / 2
-    return {
-        "estimate": estimate,
-        "low": values[max(0, int(alpha * len(values)))],
-        "high": values[min(len(values) - 1, int((1 - alpha) * len(values)) - 1)],
-        "valid_resamples": len(values),
-    }
+    return _interval_payload(estimate, values, resamples, seed, confidence, len(rows))
 
 
 def paired_bootstrap_difference(
@@ -85,14 +91,18 @@ def paired_bootstrap_difference(
     differences.sort()
     low = differences[int(.025 * len(differences))] if differences else None
     high = differences[min(len(differences) - 1, int(.975 * len(differences)))] if differences else None
-    interpretation = "inconclusive comparison"
+    interpretation = "inconclusive"
     if low is not None and low > 0:
-        interpretation = "evidence of improvement; interval excludes zero"
+        interpretation = "evidence_of_improvement"
     elif high is not None and high < 0:
-        interpretation = "evidence of lower performance; interval excludes zero"
+        interpretation = "evidence_of_decrease"
     return {
         "difference": estimate, "low": low, "high": high,
-        "valid_resamples": len(differences), "interpretation": interpretation,
+        "confidence_level": .95, "requested_resamples": resamples,
+        "valid_resamples": len(differences), "rejected_resamples": resamples - len(differences),
+        "seed": seed, "method": "paired_percentile_bootstrap",
+        "eligible_samples": len(labels), "missing_value_exclusions": 0,
+        "interpretation": "insufficient_data" if estimate is None else interpretation,
     }
 
 

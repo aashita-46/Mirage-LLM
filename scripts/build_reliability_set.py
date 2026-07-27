@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from api.core import DatasetManifest
+from api.core import DatasetManifest, utc_now
 from api.dataset_tools import dataset_report
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -96,7 +96,14 @@ def build() -> DatasetManifest:
         name="mirage-reliability-set-v1", version="1.0",
         description="A 200-item provenance-aware research set assembled from pinned human-authored TruthfulQA and SQuAD 2.0 gold annotations. Verification means source-gold-labelled, not independently reverified by Mirage.",
         license="Composite: TruthfulQA Apache-2.0; SQuAD 2.0 CC BY-SA 4.0. Preserve source attribution.",
-        demonstration=False, examples=examples,
+        demonstration=False,
+        source_revisions={
+            "TruthfulQA": "013686a06be7a7bde5bf8223943e106c7250123c",
+            "SQuAD2": "dev-v2.0.json",
+        },
+        build_script_version="1.1",
+        build_timestamp=utc_now(),
+        examples=examples,
     )
 
 

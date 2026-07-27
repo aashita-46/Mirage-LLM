@@ -326,6 +326,41 @@ Exports are written to `data/exports/`.
 
 ## Reproducibility
 
+### Hardening and eligibility rules
+
+Metric definitions are exposed by `GET /api/v1/metrics` from one backend registry.
+Unavailable quantities remain `null` with an eligibility reason: for example, AUROC
+requires both correctness classes, semantic entropy requires at least two valid
+samples, and numerical variance requires at least two numeric responses. Missing
+signals are never substituted with zero.
+
+Semantic clusters use deterministic connected components over the thresholded
+similarity graph. The stored trace contains the algorithm, model identifier,
+threshold, input hashes, similarity matrix, assignments, representative and
+warnings. Numeric and negation contradiction checks are documented heuristics, not
+natural-language inference. Threshold sensitivity is descriptive and must not be
+used to select a threshold on the same test set.
+
+Each new experiment stores a SHA-256 dataset fingerprint and a versioned canonical
+configuration fingerprint covering metric versions and every configured
+result-affecting field. Changing dataset content without changing its displayed
+version therefore creates a different experiment identity. Human labels are
+effective for aggregates, calibration, routing, reports and exports, while the
+automated label and append-only override history remain preserved.
+
+Calibration results are out-of-sample only when the stored train and evaluation
+indices are disjoint. They are conditional on that dataset/model/prompt setting and
+should not be assumed to transfer. Bootstrap intervals use percentile resampling and
+record requested, valid and rejected samples; paired comparisons use identical
+resampled indices.
+
+Internal checks:
+
+```bash
+python scripts/validate_system.py all
+python scripts/analyse_threshold_sensitivity.py --experiment-group research-v1
+```
+
 Each experiment stores:
 
 - Deterministic experiment ID
