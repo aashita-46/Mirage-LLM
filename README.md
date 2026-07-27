@@ -240,6 +240,11 @@ npm run dev
 
 Open `http://localhost:5173`.
 
+The Vercel serverless deployment uses `/tmp/mirage.db`. This filesystem is
+ephemeral, so the hosted interface demonstrates the complete evaluation workflow but
+does not promise durable experiment storage between function instances. Use the
+local SQLite setup for reproducible persistence.
+
 ## Docker
 
 ```bash

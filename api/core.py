@@ -27,7 +27,10 @@ DATASET_DIR = DATA_DIR / "datasets"
 class Settings(BaseModel):
     environment: str = os.getenv("MIRAGE_ENV", "development")
     mode: str = os.getenv("MIRAGE_MODE", "local_research")
-    database_path: Path = Path(os.getenv("MIRAGE_DATABASE_PATH", DATA_DIR / "mirage.db"))
+    database_path: Path = Path(os.getenv(
+        "MIRAGE_DATABASE_PATH",
+        "/tmp/mirage.db" if os.getenv("VERCEL") else DATA_DIR / "mirage.db",
+    ))
     log_level: str = os.getenv("MIRAGE_LOG_LEVEL", "INFO")
     max_dataset_examples: int = int(os.getenv("MIRAGE_MAX_DATASET_EXAMPLES", "1000"))
     schema_version: str = SCHEMA_VERSION
