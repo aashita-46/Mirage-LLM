@@ -1,101 +1,118 @@
-# Mirage build report
+# Mirage research-platform build report
 
-## Delivered
+## Outcome
 
-A full-stack recruiter-facing Mirage application with a React/Vite frontend and a
-FastAPI-compatible Python backend. It includes API-backed analysis, token uncertainty,
-meaning-level sample clusters, experimental MirageScore, model self-verification,
-adversarial prompt stress testing, and a curated benchmark that computes AUROC, ECE,
-Brier score, calibration bins, and per-record outcomes at run time.
+Mirage is now a local-first LLM reliability evaluation platform. It separates
+uncertainty signals from labelled correctness, preserves raw cached provider outputs,
+computes calibration and selective-prediction metrics, persists versioned experiments
+in SQLite, and exposes the results through a responsive research interface.
 
-The default mode is clearly labelled **Cached demonstration**. Values are generated
-deterministically from repository-defined records and calculated by the backend; they
-are never presented as live model inference or external benchmark performance.
+The implementation was completed and verified locally before the later authorised
+GitHub publication and Vercel production deployment.
 
-## Important files
+## Architecture changes
 
-- `src/App.tsx` — complete product experience and interaction flows
-- `src/components/` — gauge, token heatmap, and coordinated analysis view
-- `src/styles.css` — responsive research-lab visual system
-- `api/index.py` — API, uncertainty mathematics, stress engine, and benchmark
-- `tests/test_api.py` — backend mathematical and API tests
-- `README.md` — architecture, methodology, configuration, run modes, and limitations
-- `vercel.json` — Vite plus Python serverless deployment
-- `Dockerfile`, `api.Dockerfile`, `docker-compose.yml` — container workflow
+- `api/core.py` contains versioned Pydantic contracts, provider capabilities,
+  deterministic scoring, signal calculation, metrics, failure categorisation,
+  persistence, overrides, and export.
+- `api/index.py` is the HTTP boundary with structured errors and routes for datasets,
+  models, playground analysis, experiments, comparisons, overrides, and reports.
+- `data/datasets/mirage-starter.json` is an 18-example, multi-domain demonstration
+  dataset. Cached responses are explicitly labelled and are not a live benchmark.
+- `scripts/evaluate.py` runs the same pipeline without the browser.
+- The React application is organised into Overview, Playground, Experiments,
+  Datasets, Compare, Calibration, Failures, Reports, Methodology, and Settings views.
 
-## Run locally
+## Features completed
 
-```text
+- JSON and JSONL dataset validation, preview, filtering, upload, and version metadata
+- deterministic experiment IDs, schema version 2.0, timestamps, and model metadata
+- provider capability flags; unsupported log probabilities remain unavailable
+- acceptable-answer matching, normalised exact match, token F1, numeric tolerance,
+  date normalisation, and explicit unanswerable evaluation
+- configurable multi-response grouping with an honestly labelled lexical fallback
+- semantic entropy, response consistency, self-verification uncertainty, and an
+  experimental weighted Mirage Risk Score with contribution traces
+- AUROC, AUPRC, ECE, Brier score, NLL, reliability bins, risk-coverage, and
+  signal-comparison calculations with validity and small-sample warnings
+- SQLite migrations and storage for raw outputs, aggregate metrics, errors, and
+  human overrides without overwriting automated labels
+- partial-failure-aware experiment runs and per-example error states
+- failure taxonomy and slices for confidently wrong and uncertain-correct examples
+- JSON, CSV, Markdown, and HTML exports
+- desktop and mobile research UI with capability-aware controls and meaningful states
+- methodology and limitation documentation in the application and README
+
+## Reproducible starter run
+
+Research question: Which available uncertainty signal best separates correct and
+incorrect factual answers on the included demonstration dataset?
+
+The locally executed cached-provider run produced experiment
+`exp_6bc242fcbb015c76` over 18 labelled examples:
+
+- accuracy: 0.778
+- combined-risk AUROC: 0.589
+- combined-risk AUPRC: 0.339
+- ECE: 0.434
+- Brier score: 0.315
+
+These are pipeline outputs from repository-labelled cached responses, not claims about
+a live model or a definitive benchmark. Calibration is explicitly flagged as unstable
+because the dataset contains fewer than 30 examples.
+
+## Verification
+
+- backend: `16 passed`
+- frontend: `5 passed`
+- TypeScript production build: passed
+- lint: passed
+- npm audit: zero vulnerabilities
+- CLI starter experiment: completed, 18 examples, zero provider failures
+- API health: schema 2.0, SQLite, local research mode
+- desktop browser: experiment creation and result rendering passed
+- phone browser: 390 × 844 viewport, no horizontal overflow
+- signal controls, comparison navigation, deletion controls, and human overrides:
+  browser-verified
+
+## Run commands
+
+```powershell
 npm install
-python -m pip install -r requirements.txt uvicorn pytest httpx
-python -m uvicorn api.index:app --reload --port 8000
-npm run dev
-```
-
-Open `http://localhost:5173`.
-
-## Real local model and Groq
-
-The provider contract and environment variables are documented in `.env.example` and
-`README.md`. Install PyTorch/Transformers/NLI dependencies separately before enabling
-a local provider; model weights are never downloaded at app startup. For Groq, set
-`GROQ_API_KEY` only in a server-side secret store and configure `GROQ_MODEL`. The
-deployed demonstration does not require or expose a key.
-
-## Verification completed
-
-- `python -m pytest -q` — **9 passed**
-- `npm test` — **2 passed**
-- `npm run build` — **passed**, 1,937 modules transformed
-- `npm audit --audit-level=high` — **0 vulnerabilities**
-- API health smoke test — HTTP success, `cached_demo`
-- Browser analysis flow — 14 token cells, 6 samples, no console errors
-- Browser stress flow — 5 variant results
-- Browser benchmark flow — 4 computed metrics, 12 result records
-- Mobile check — navigation breakpoint active; no horizontal overflow
-
-Docker files were authored, but the Docker Desktop daemon was not running on this
-machine, so container execution was not claimed as verified.
-
-## Known limitations / deferred
-
-- The hosted deployment uses deterministic cached analysis, not live Hugging Face
-  inference. The current machine has no system Python or detected NVIDIA runtime.
-- Bidirectional neural NLI, Hugging Face logits, persistent SQLite leaderboard,
-  true SSE token streaming, provider-side Groq calls, external dataset adapters,
-  pause/resume benchmark jobs, and learned calibration remain production extensions.
-- The curated benchmark verifies metric plumbing and UI behavior; it is not a model
-  performance claim.
-
-## Exact verification commands
-
-```text
-npm install
-npm run build
-npm test
-npm audit --audit-level=high
-<bundled-python> -m pip install -r requirements.txt uvicorn pytest httpx
-<bundled-python> -m pytest -q
-<bundled-python> -m uvicorn api.index:app --host 127.0.0.1 --port 8000
+& "<bundled-python>" -m pip install -r requirements.txt
+& "<bundled-python>" -m uvicorn api.index:app --host 127.0.0.1 --port 8000
 npm run dev -- --host 127.0.0.1
 ```
 
-## Production deployment
+Open `http://127.0.0.1:5173`.
 
-**https://mirage-llm.vercel.app**
+Run the CLI experiment with:
 
-Vercel deployment `dpl_Ae3GzsR3qYx6oXhfD24paS7dfUsg` reports **Ready**.
-Production smoke tests confirmed:
+```powershell
+& "<bundled-python>" scripts/evaluate.py --config config/starter-experiment.json
+```
 
-- Landing page: HTTP 200 with the expected Mirage title
-- `GET /api/v1/health`: HTTP 200, `cached_demo`
-- `POST /api/v1/analyse`: 14 token records and 6 semantic samples returned
+## Known limitations
 
-### Mobile optimisation verification
+- The included provider is cached demonstration data; it performs no live inference.
+- Token uncertainty is disabled because cached outputs contain no provider-native
+  token distributions. No values are estimated.
+- Semantic clustering uses a lexical Jaccard fallback, not NLI or embeddings.
+- Self-verification fields are cached provider metadata, not ground truth.
+- Retrieval faithfulness, streaming, pause/cancel, learned calibration, and live
+  OpenAI-compatible/Ollama providers remain extension points.
+- The starter dataset is intentionally small; its metrics are useful for validating
+  the pipeline, not drawing scientific conclusions.
+- Docker configuration was updated but the container runtime was not available for
+  execution on this machine.
 
-The production interface was hardened for 320–390 px phone widths with safe-area
-insets, 44–50 px touch targets, an accessible collapsible navigation menu, stacked
-analysis controls, wrapped metadata, mobile benchmark result cards, and narrow-screen
-metric layouts. Browser checks confirmed no horizontal document overflow at either
-breakpoint, menu close-on-navigation, working analysis/benchmark flows, and zero
-rendered error states.
+## Recommended next experiments
+
+1. Add an OpenAI-compatible or Ollama provider and capture native capability metadata.
+2. Replace lexical clustering with a frozen embedding or bidirectional NLI evaluator.
+3. Run at least 200 independently labelled examples with stratified domain slices.
+4. Compare prompt, temperature, retrieval, and model variants under identical data.
+5. Fit Platt or isotonic calibration on a training split and evaluate on a held-out
+   split only.
+6. Measure coverage at target accuracy and review-budget outcomes with confidence
+   intervals.

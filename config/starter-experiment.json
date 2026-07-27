@@ -1,0 +1,36 @@
+{
+  "experiment_name": "Starter uncertainty-signal study",
+  "dataset_name": "mirage-starter",
+  "dataset_version": "1.0",
+  "provider": "cached_demo",
+  "model": "mirage/cached-research-samples",
+  "prompt_template": "{question}",
+  "system_prompt": "Answer concisely. If the premise is false or unknowable, say so.",
+  "sampling": {
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "max_tokens": 180,
+    "seed": 42,
+    "semantic_samples": 6
+  },
+  "signals": {
+    "semantic_entropy": true,
+    "response_consistency": true,
+    "self_verification": true,
+    "token_uncertainty": false,
+    "retrieval_faithfulness": false,
+    "clustering_method": "lexical_fallback",
+    "weights": {
+      "semantic_entropy": 0.45,
+      "response_inconsistency": 0.3,
+      "self_verification_uncertainty": 0.25
+    }
+  },
+  "evaluator": {
+    "methods": ["acceptable_answer", "normalised_exact_match", "token_f1"],
+    "numeric_tolerance": 0.01,
+    "llm_judge_enabled": false
+  },
+  "retrieval_enabled": false,
+  "retrieval_config": {}
+}

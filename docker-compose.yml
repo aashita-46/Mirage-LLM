@@ -4,7 +4,11 @@ services:
       context: .
       dockerfile: api.Dockerfile
     ports: ["8000:8000"]
+    volumes:
+      - mirage-data:/app/data
   web:
     build: .
     ports: ["8080:80"]
     depends_on: [api]
+volumes:
+  mirage-data:

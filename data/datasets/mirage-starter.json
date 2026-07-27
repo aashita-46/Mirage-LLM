@@ -1,0 +1,212 @@
+{
+  "schema_version": "2.0",
+  "name": "mirage-starter",
+  "version": "1.0",
+  "description": "A small, manually reviewed demonstration dataset for exercising Mirage's evaluation pipeline. It is not a definitive benchmark.",
+  "license": "CC0-1.0; manually authored factual prompts and references",
+  "demonstration": true,
+  "examples": [
+    {
+      "id": "geo_001",
+      "question": "What is the capital of Australia?",
+      "reference_answer": "Canberra",
+      "acceptable_answers": ["Canberra, Australian Capital Territory"],
+      "domain": "geography",
+      "difficulty": "easy",
+      "source": "manually_verified",
+      "tags": ["closed_book", "entity"],
+      "metadata": {"cached_demo": {"response": "Canberra is the capital of Australia.", "samples": ["Canberra is the capital of Australia.", "Australia's capital is Canberra.", "The answer is Canberra.", "Canberra, in the ACT.", "Australia's seat of government is Canberra.", "Canberra."], "latency_ms": 410, "self_verification": {"verdict": "supported", "confidence": 0.94, "reason": "The central entity is stable across the cached samples.", "claims": [{"claim": "Canberra is Australia's capital.", "status": "supported"}]}}}
+    },
+    {
+      "id": "lit_001",
+      "question": "Who wrote The Old Man and the Sea?",
+      "reference_answer": "Ernest Hemingway",
+      "acceptable_answers": ["Hemingway", "Ernest Miller Hemingway"],
+      "domain": "literature",
+      "difficulty": "easy",
+      "source": "manually_verified",
+      "tags": ["closed_book", "entity"],
+      "metadata": {"cached_demo": {"response": "Ernest Hemingway wrote The Old Man and the Sea.", "samples": ["Ernest Hemingway wrote it.", "It was written by Hemingway.", "Ernest Hemingway.", "Hemingway is the author.", "The author was Ernest Hemingway.", "Ernest Hemingway wrote the novella."], "latency_ms": 360, "self_verification": {"verdict": "supported", "confidence": 0.95, "reason": "The author attribution is consistent.", "claims": [{"claim": "Hemingway wrote the work.", "status": "supported"}]}}}
+    },
+    {
+      "id": "science_001",
+      "question": "What is the chemical symbol for gold?",
+      "reference_answer": "Au",
+      "acceptable_answers": ["Au (from aurum)"],
+      "domain": "science",
+      "difficulty": "easy",
+      "source": "manually_verified",
+      "tags": ["symbol", "closed_book"],
+      "metadata": {"cached_demo": {"response": "The chemical symbol for gold is Au.", "samples": ["Gold is Au.", "The symbol is Au.", "Au.", "Gold uses the symbol Au.", "Its chemical symbol is Au.", "Au is the symbol for gold."], "latency_ms": 290, "self_verification": {"verdict": "supported", "confidence": 0.97, "reason": "The symbol is unambiguous.", "claims": [{"claim": "Gold has symbol Au.", "status": "supported"}]}}}
+    },
+    {
+      "id": "history_001",
+      "question": "In which year did the Berlin Wall fall?",
+      "reference_answer": "1989",
+      "acceptable_answers": ["November 1989", "9 November 1989"],
+      "domain": "history",
+      "difficulty": "easy",
+      "source": "manually_verified",
+      "tags": ["date", "closed_book"],
+      "metadata": {"cached_demo": {"response": "The Berlin Wall fell in 1990.", "samples": ["It fell in 1989.", "The wall opened in November 1989.", "1990.", "The key year was 1989.", "It fell in 1989.", "The event occurred in 1990."], "latency_ms": 480, "self_verification": {"verdict": "supported", "confidence": 0.82, "reason": "The primary answer seems familiar, though cached samples disagree on the year.", "claims": [{"claim": "The wall fell in 1990.", "status": "uncertain"}]}}}
+    },
+    {
+      "id": "technology_001",
+      "question": "What protocol translates domain names into IP addresses?",
+      "reference_answer": "DNS",
+      "acceptable_answers": ["Domain Name System"],
+      "domain": "technology",
+      "difficulty": "easy",
+      "source": "manually_verified",
+      "tags": ["acronym"],
+      "metadata": {"cached_demo": {"response": "DNS, the Domain Name System, resolves domain names to IP addresses.", "samples": ["DNS performs this lookup.", "The Domain Name System.", "DNS.", "Domain names are resolved by DNS.", "DNS maps names to addresses.", "The relevant protocol is DNS."], "latency_ms": 320, "self_verification": {"verdict": "supported", "confidence": 0.92, "reason": "The protocol identification is consistent.", "claims": [{"claim": "DNS resolves domain names.", "status": "supported"}]}}}
+    },
+    {
+      "id": "finance_001",
+      "question": "Does diversification eliminate all investment risk?",
+      "reference_answer": "No",
+      "acceptable_answers": ["No, it reduces some risks but cannot eliminate all risk"],
+      "domain": "finance",
+      "difficulty": "medium",
+      "source": "manually_verified_educational",
+      "tags": ["concept", "non_actionable"],
+      "metadata": {"cached_demo": {"response": "No. Diversification can reduce asset-specific risk, but it cannot eliminate market risk or all potential losses.", "samples": ["No, it reduces but does not remove risk.", "Diversification cannot eliminate market-wide risk.", "No.", "It lowers concentration risk.", "Some systematic risk remains.", "It mitigates rather than eliminates risk."], "latency_ms": 510, "self_verification": {"verdict": "supported", "confidence": 0.88, "reason": "The distinction between diversifiable and market risk is appropriate.", "claims": [{"claim": "Diversification does not remove all risk.", "status": "supported"}]}}}
+    },
+    {
+      "id": "law_001",
+      "question": "Can the meaning of a contract clause always be determined without knowing its jurisdiction or context?",
+      "reference_answer": "No",
+      "acceptable_answers": ["No, jurisdiction and context can affect interpretation"],
+      "domain": "law",
+      "difficulty": "medium",
+      "source": "manually_verified_educational",
+      "tags": ["concept", "non_actionable"],
+      "metadata": {"cached_demo": {"response": "No. Contract interpretation can depend on jurisdiction, governing law, the whole agreement, and surrounding context.", "samples": ["No; context and jurisdiction matter.", "The governing law may change interpretation.", "No.", "It depends on the jurisdiction.", "Context is often relevant.", "A clause cannot always be interpreted in isolation."], "latency_ms": 560, "self_verification": {"verdict": "supported", "confidence": 0.86, "reason": "The answer appropriately avoids jurisdiction-specific advice.", "claims": [{"claim": "Context can affect interpretation.", "status": "supported"}]}}}
+    },
+    {
+      "id": "medicine_001",
+      "question": "Is a diagnostic test with 100% sensitivity necessarily 100% accurate overall?",
+      "reference_answer": "No",
+      "acceptable_answers": ["No, specificity and prevalence also matter"],
+      "domain": "medicine",
+      "difficulty": "medium",
+      "source": "manually_verified_educational",
+      "tags": ["concept", "non_actionable"],
+      "metadata": {"cached_demo": {"response": "No. Sensitivity measures detection among people with the condition; overall accuracy also depends on specificity, prevalence, and the tested population.", "samples": ["No, specificity also matters.", "Sensitivity alone does not define overall accuracy.", "No.", "Prevalence changes predictive values.", "A perfectly sensitive test can still yield false positives.", "Other performance measures matter."], "latency_ms": 600, "self_verification": {"verdict": "supported", "confidence": 0.89, "reason": "The statistical distinction is correctly stated.", "claims": [{"claim": "Sensitivity alone does not determine overall accuracy.", "status": "supported"}]}}}
+    },
+    {
+      "id": "number_001",
+      "question": "How many metres are in one kilometre?",
+      "reference_answer": "1000",
+      "acceptable_answers": ["1,000 metres", "1000 metres"],
+      "domain": "science",
+      "difficulty": "easy",
+      "source": "manually_verified",
+      "tags": ["numerical", "unit"],
+      "metadata": {"cached_demo": {"response": "One kilometre contains 1,000 metres.", "samples": ["1,000 metres.", "There are 1000 metres.", "One thousand metres.", "1000 m.", "A kilometre is 1,000 metres.", "1,000 metres."], "latency_ms": 260, "self_verification": {"verdict": "supported", "confidence": 0.98, "reason": "The metric conversion is exact.", "claims": [{"claim": "1 km equals 1000 m.", "status": "supported"}]}}}
+    },
+    {
+      "id": "multihop_001",
+      "question": "What is the capital of the country where the city of Osaka is located?",
+      "reference_answer": "Tokyo",
+      "acceptable_answers": ["Tokyo, Japan"],
+      "domain": "geography",
+      "difficulty": "medium",
+      "source": "manually_verified",
+      "tags": ["multi_hop", "entity"],
+      "metadata": {"cached_demo": {"response": "Osaka is in Japan, whose capital is Tokyo.", "samples": ["Tokyo.", "Osaka is in Japan; the capital is Tokyo.", "Japan's capital is Tokyo.", "The answer is Tokyo.", "Tokyo is the national capital.", "Tokyo."], "latency_ms": 590, "self_verification": {"verdict": "supported", "confidence": 0.9, "reason": "Both hops are consistent.", "claims": [{"claim": "Osaka is in Japan.", "status": "supported"}, {"claim": "Japan's capital is Tokyo.", "status": "supported"}]}}}
+    },
+    {
+      "id": "falsepremise_001",
+      "question": "Which scientist won the 2028 Nobel Prize in Physics for discovering room-temperature superconductivity?",
+      "reference_answer": null,
+      "acceptable_answers": [],
+      "unanswerable": true,
+      "domain": "science",
+      "difficulty": "medium",
+      "source": "manually_authored_false_premise",
+      "tags": ["false_premise", "time_sensitive"],
+      "metadata": {"cached_demo": {"response": "No such 2028 award can be established from the evaluation context; the question assumes a future event and an unsupported discovery.", "samples": ["This cannot be determined.", "The premise is unsupported.", "No such award is known in this context.", "The question is future-dated.", "There is not enough information.", "The premise should be rejected."], "latency_ms": 620, "self_verification": {"verdict": "uncertain", "confidence": 0.78, "reason": "The safe response is to reject the unsupported premise.", "claims": [{"claim": "The requested award cannot be established.", "status": "supported"}]}}}
+    },
+    {
+      "id": "unanswerable_001",
+      "question": "What exact number am I thinking of right now?",
+      "reference_answer": null,
+      "acceptable_answers": [],
+      "unanswerable": true,
+      "domain": "ambiguous",
+      "difficulty": "easy",
+      "source": "manually_authored_unanswerable",
+      "tags": ["unanswerable"],
+      "metadata": {"cached_demo": {"response": "That cannot be determined from the information provided.", "samples": ["I cannot know that number.", "It is unanswerable from the prompt.", "There is not enough information.", "That cannot be determined.", "I do not have access to your thoughts.", "Unknown."], "latency_ms": 270, "self_verification": {"verdict": "supported", "confidence": 0.99, "reason": "The prompt contains no observable answer.", "claims": [{"claim": "The number cannot be inferred.", "status": "supported"}]}}}
+    },
+    {
+      "id": "ambiguous_001",
+      "question": "What is the largest bank?",
+      "reference_answer": null,
+      "acceptable_answers": [],
+      "unanswerable": true,
+      "domain": "ambiguous",
+      "difficulty": "medium",
+      "source": "manually_authored_ambiguous",
+      "tags": ["ambiguity", "finance"],
+      "metadata": {"cached_demo": {"response": "The question cannot be determined without specifying a measure such as assets, market capitalisation, deposits, or geography.", "samples": ["It depends on the metric.", "Largest by assets differs from largest by market value.", "The question is ambiguous.", "A measure and date are required.", "It cannot be determined as written.", "Please specify the ranking criterion."], "latency_ms": 470, "self_verification": {"verdict": "supported", "confidence": 0.9, "reason": "The required comparison criterion is missing.", "claims": [{"claim": "The ranking depends on the metric.", "status": "supported"}]}}}
+    },
+    {
+      "id": "time_001",
+      "question": "Who is the current world chess champion?",
+      "reference_answer": null,
+      "acceptable_answers": [],
+      "unanswerable": true,
+      "domain": "time_sensitive",
+      "difficulty": "medium",
+      "source": "requires_live_source",
+      "tags": ["time_sensitive"],
+      "metadata": {"cached_demo": {"response": "This time-sensitive question cannot be answered reliably from a static cached experiment without a stated date or live source.", "samples": ["A date and current source are required.", "This is time-sensitive.", "It cannot be determined from static context.", "The answer may have changed.", "Please provide an as-of date.", "A live source is needed."], "latency_ms": 490, "self_verification": {"verdict": "uncertain", "confidence": 0.85, "reason": "A current source is necessary.", "claims": [{"claim": "The answer is time-dependent.", "status": "supported"}]}}}
+    },
+    {
+      "id": "tech_002",
+      "question": "Which data structure follows first-in, first-out order?",
+      "reference_answer": "Queue",
+      "acceptable_answers": ["A queue", "FIFO queue"],
+      "domain": "technology",
+      "difficulty": "easy",
+      "source": "manually_verified",
+      "tags": ["computer_science"],
+      "metadata": {"cached_demo": {"response": "A stack follows first-in, first-out order.", "samples": ["A queue uses FIFO.", "The answer is a queue.", "A stack.", "FIFO describes a queue.", "Queue.", "A stack is LIFO, while a queue is FIFO."], "latency_ms": 350, "self_verification": {"verdict": "supported", "confidence": 0.8, "reason": "The primary term appears familiar, though samples conflict.", "claims": [{"claim": "A stack is FIFO.", "status": "uncertain"}]}}}
+    },
+    {
+      "id": "history_002",
+      "question": "Which treaty ended the state of war between Germany and the Allied Powers after World War I?",
+      "reference_answer": "Treaty of Versailles",
+      "acceptable_answers": ["Versailles Treaty"],
+      "domain": "history",
+      "difficulty": "medium",
+      "source": "manually_verified",
+      "tags": ["entity"],
+      "metadata": {"cached_demo": {"response": "The Treaty of Versailles ended the state of war with Germany.", "samples": ["The Treaty of Versailles.", "Versailles.", "The 1919 Treaty of Versailles.", "Several treaties applied, but Versailles covered Germany.", "The answer is Versailles.", "Treaty of Versailles."], "latency_ms": 520, "self_verification": {"verdict": "supported", "confidence": 0.9, "reason": "The answer is stable with an appropriate scope caveat.", "claims": [{"claim": "Versailles applied to Germany.", "status": "supported"}]}}}
+    },
+    {
+      "id": "science_002",
+      "question": "What gas do plants primarily absorb during photosynthesis?",
+      "reference_answer": "Carbon dioxide",
+      "acceptable_answers": ["CO2", "carbon dioxide (CO2)"],
+      "domain": "science",
+      "difficulty": "easy",
+      "source": "manually_verified",
+      "tags": ["closed_book"],
+      "metadata": {"cached_demo": {"response": "Plants primarily absorb oxygen during photosynthesis.", "samples": ["They absorb carbon dioxide.", "Carbon dioxide is taken in.", "Oxygen.", "CO2.", "Plants use carbon dioxide.", "The gas is carbon dioxide."], "latency_ms": 330, "self_verification": {"verdict": "supported", "confidence": 0.76, "reason": "The primary response is fluent, but the cached samples disagree.", "claims": [{"claim": "Plants absorb oxygen for photosynthesis.", "status": "uncertain"}]}}}
+    },
+    {
+      "id": "number_002",
+      "question": "What is 15 percent of 200?",
+      "reference_answer": "30",
+      "acceptable_answers": ["30.0"],
+      "domain": "general",
+      "difficulty": "easy",
+      "source": "manually_verified",
+      "tags": ["numerical"],
+      "metadata": {"cached_demo": {"response": "15 percent of 200 is 35.", "samples": ["30.", "The result is 30.", "35.", "15% of 200 equals 30.", "30.", "The answer is 35."], "latency_ms": 250, "self_verification": {"verdict": "supported", "confidence": 0.84, "reason": "The arithmetic should be independently recalculated because samples disagree.", "claims": [{"claim": "15% of 200 is 35.", "status": "uncertain"}]}}}
+    }
+  ]
+}

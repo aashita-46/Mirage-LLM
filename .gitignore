@@ -6,6 +6,8 @@ __pycache__/
 .pytest_cache/
 *.pyc
 *.db
+data/exports/
+vite-local.*.log
 .vercel/
 coverage/
 *.tsbuildinfo
