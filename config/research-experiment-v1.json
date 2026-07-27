@@ -1,0 +1,48 @@
+{
+  "experiment_name": "Mirage Reliability Study v1",
+  "experiment_group": "research-v1",
+  "dataset_name": "mirage-reliability-set-v1",
+  "dataset_version": "1.0",
+  "prompt_template": "{question}",
+  "system_prompt": "Answer concisely and factually. Reject false premises and state when the supplied information is insufficient.",
+  "sampling": {
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "max_tokens": 128,
+    "seed": 42,
+    "semantic_samples": 6,
+    "timeout_seconds": 120,
+    "retry_count": 2,
+    "max_parallel_requests": 1
+  },
+  "signals": {
+    "semantic_entropy": true,
+    "response_consistency": true,
+    "self_verification": true,
+    "token_uncertainty": false,
+    "retrieval_faithfulness": false,
+    "clustering_method": "embedding",
+    "embedding_model": "all-minilm",
+    "similarity_threshold": 0.78,
+    "weights": {
+      "semantic_entropy": 0.45,
+      "response_inconsistency": 0.30,
+      "self_verification_uncertainty": 0.25
+    }
+  },
+  "evaluator": {
+    "methods": ["acceptable_answer", "normalised_exact_match", "token_f1"],
+    "numeric_tolerance": 0.01,
+    "llm_judge_enabled": false
+  },
+  "retrieval_enabled": false,
+  "retrieval_config": {},
+  "verified_only": true,
+  "bootstrap_resamples": 1000,
+  "bootstrap_seed": 42,
+  "models": [
+    {"provider": "ollama", "model": "qwen2.5vl:3b"},
+    {"provider": "ollama", "model": "phi:latest"},
+    {"provider": "ollama", "model": "mistral:latest"}
+  ]
+}

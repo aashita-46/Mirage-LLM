@@ -13,14 +13,14 @@ import {
 import { api } from "./lib/api";
 import type {
   AggregateMetrics, Analysis, DatasetManifest, DatasetSummary, ExampleResult,
-  ExperimentRecord, ExperimentSummary
+  ExperimentRecord, ExperimentSummary, ProviderModel
 } from "./types";
 
-type View = "overview"|"playground"|"experiments"|"datasets"|"compare"|"calibration"|"failures"|"reports"|"methodology"|"settings";
+type View = "overview"|"playground"|"experiments"|"datasets"|"compare"|"calibration"|"failures"|"findings"|"reports"|"methodology"|"settings";
 const nav: [View,string][] = [
   ["playground","Playground"],["experiments","Experiments"],["datasets","Datasets"],
   ["compare","Compare"],["calibration","Calibration"],["failures","Failures"],
-  ["reports","Reports"],["methodology","Methodology"]
+  ["findings","Findings"],["reports","Reports"],["methodology","Methodology"]
 ];
 const starterConfig = {
   experiment_name:"Starter uncertainty-signal study",dataset_name:"mirage-starter",dataset_version:"1.0",
@@ -137,24 +137,27 @@ function Experiments({onSelected}:{onSelected:(r:ExperimentRecord)=>void}) {
   const [datasets,setDatasets]=useState<DatasetSummary[]>([]),[datasetName,setDatasetName]=useState("mirage-starter");
   const [semanticEntropy,setSemanticEntropy]=useState(true),[responseConsistency,setResponseConsistency]=useState(true);
   const [selfVerification,setSelfVerification]=useState(true);
+  const [models,setModels]=useState<ProviderModel[]>([]),[selectedModel,setSelectedModel]=useState("cached_demo|mirage/cached-research-samples");
+  const [semanticMethod,setSemanticMethod]=useState("lexical_fallback");
   const refresh=()=>api.experiments().then(x=>setItems(x.experiments)).catch(e=>setError(String(e)));
-  useEffect(()=>{refresh();api.datasets().then(x=>setDatasets(x.datasets)).catch(()=>{})},[]);
+  useEffect(()=>{refresh();api.datasets().then(x=>setDatasets(x.datasets)).catch(()=>{});api.models().then(x=>setModels(x.models)).catch(()=>{})},[]);
   const run=async()=>{
     setLoading(true);setError("");
     const dataset=datasets.find(item=>item.name===datasetName);
+    const [provider,model]=selectedModel.split("|",2);
     try{
       const record=await api.runExperiment({
-        ...starterConfig,experiment_name:name,dataset_name:datasetName,
+        ...starterConfig,experiment_name:name,dataset_name:datasetName,provider,model,
         dataset_version:dataset?.version??"1.0",
         sampling:{...starterConfig.sampling,semantic_samples:sampleCount},
-        signals:{...starterConfig.signals,semantic_entropy:semanticEntropy,
+        signals:{...starterConfig.signals,semantic_entropy:semanticEntropy,clustering_method:semanticMethod,
           response_consistency:responseConsistency,self_verification:selfVerification},
       });
       onSelected(record);refresh();
     }catch(e){setError(String(e))}finally{setLoading(false)}
   };
   return <Page eyebrow="EXPERIMENT RUNNER" title="Run reproducible evaluations—not dashboard theatre." intro="Each run saves raw cached responses, evaluator outputs, signal configuration, schema version, and aggregate results to SQLite.">
-    <div className="runner-layout"><section className="panel runner-config"><h3>Experiment configuration</h3><label>Name<input value={name} onChange={e=>setName(e.target.value)}/></label><label>Dataset<select value={datasetName} onChange={e=>setDatasetName(e.target.value)}>{datasets.map(d=><option value={d.name} key={d.name}>{d.name} v{d.version} · {d.size} examples</option>)}</select></label><label>Provider<select><option>Cached demonstration provider</option></select></label><label>Semantic samples<select value={sampleCount} onChange={e=>setSampleCount(+e.target.value)}>{[4,6,8,10].map(x=><option key={x}>{x}</option>)}</select></label><fieldset><legend>Signals</legend><label><input type="checkbox" checked={semanticEntropy} onChange={e=>setSemanticEntropy(e.target.checked)}/> Semantic entropy</label><label><input type="checkbox" checked={responseConsistency} onChange={e=>setResponseConsistency(e.target.checked)}/> Response consistency</label><label><input type="checkbox" checked={selfVerification} onChange={e=>setSelfVerification(e.target.checked)}/> Self-verification</label><label className="disabled"><input type="checkbox" disabled/> Token uncertainty · provider unsupported</label><label className="disabled"><input type="checkbox" disabled/> Retrieval faithfulness · not configured</label></fieldset><button className="primary" disabled={loading||(!semanticEntropy&&!responseConsistency&&!selfVerification)} onClick={run}>{loading?<RefreshCw className="spin"/>:<FlaskConical/>}{loading?"Running labelled examples…":"Run evaluation"}</button>{!semanticEntropy&&!responseConsistency&&!selfVerification&&<small className="warning-copy">Enable at least one available signal.</small>}</section>
+    <div className="runner-layout"><section className="panel runner-config"><h3>Experiment configuration</h3><label>Name<input value={name} onChange={e=>setName(e.target.value)}/></label><label>Dataset<select value={datasetName} onChange={e=>setDatasetName(e.target.value)}>{datasets.map(d=><option value={d.name} key={d.name}>{d.name} v{d.version} · {d.size} examples</option>)}</select></label><label>Provider / model<select value={selectedModel} onChange={e=>setSelectedModel(e.target.value)}>{models.filter(x=>x.available!==false).map(x=><option value={`${x.provider}|${x.model}`} key={`${x.provider}|${x.model}`}>{x.mode==="cached_demo"?"Cached demo":`${x.provider} · ${x.model}`}</option>)}</select></label><label>Semantic method<select value={semanticMethod} onChange={e=>setSemanticMethod(e.target.value)}><option value="lexical_fallback">Lexical Jaccard fallback</option><option value="embedding">Embedding cosine · all-minilm</option></select></label><label>Semantic samples<select value={sampleCount} onChange={e=>setSampleCount(+e.target.value)}>{[4,6,8,10].map(x=><option key={x}>{x}</option>)}</select></label><fieldset><legend>Signals</legend><label><input type="checkbox" checked={semanticEntropy} onChange={e=>setSemanticEntropy(e.target.checked)}/> Semantic entropy</label><label><input type="checkbox" checked={responseConsistency} onChange={e=>setResponseConsistency(e.target.checked)}/> Response consistency</label><label><input type="checkbox" checked={selfVerification} onChange={e=>setSelfVerification(e.target.checked)}/> Self-verification</label><label className="disabled"><input type="checkbox" disabled/> Token uncertainty · capability dependent</label><label className="disabled"><input type="checkbox" disabled/> Retrieval faithfulness · not configured</label></fieldset><button className="primary" disabled={loading||(!semanticEntropy&&!responseConsistency&&!selfVerification)} onClick={run}>{loading?<RefreshCw className="spin"/>:<FlaskConical/>}{loading?"Running labelled examples…":"Run evaluation"}</button>{!semanticEntropy&&!responseConsistency&&!selfVerification&&<small className="warning-copy">Enable at least one available signal.</small>}</section>
       <section className="panel run-explainer"><h3>What this run will do</h3>{["Load and validate the versioned dataset","Read cached provider outputs without inventing logits","Cluster sampled responses with labelled lexical fallback","Evaluate correctness against references and aliases","Compute calibration and selective prediction metrics","Persist raw outputs, metrics, and failure categories"].map((x,i)=><div key={x}><span>{i+1}</span><p>{x}</p></div>)}<p className="warning-copy"><AlertTriangle/> Cached results demonstrate the complete pipeline but are not a newly executed LLM benchmark.</p></section></div>
     {error&&<ErrorState message={error}/>}
     <h3 className="subheading">Saved experiments</h3>
@@ -212,10 +215,29 @@ function Reports({record}:{record:ExperimentRecord|null}) {
   </Page>;
 }
 
+function Findings() {
+  const [data,setData]=useState<Record<string,unknown>|null>(null),[error,setError]=useState("");
+  const [group,setGroup]=useState("live-smoke-v1");
+  useEffect(()=>{setData(null);api.findings(group).then(setData).catch(e=>setError(String(e)))},[group]);
+  const available=data?.available===true;
+  const executive=(data?.executive_findings??{}) as Record<string,unknown>;
+  const experiments=(data?.experiments??[]) as Array<Record<string,unknown>>;
+  return <Page eyebrow="RESEARCH FINDINGS" title="Answer the experiment—not the dashboard." intro="This page displays only measurements derived from stored live experiments, with preliminary smoke runs separated from the official research group.">
+    <div className="filter-row"><label>Experiment group<select value={group} onChange={e=>setGroup(e.target.value)}><option value="live-smoke-v1">Live smoke v1 · preliminary</option><option value="research-v1">Research v1 · official</option></select></label></div>
+    {group!=="research-v1"&&<div className="warning-copy panel"><AlertTriangle/> Preliminary pipeline validation only; this group cannot answer the primary research question.</div>}
+    {error&&<ErrorState message={error}/>}
+    {!data?<Empty title="Loading measured findings." copy="Reading locally stored research experiments."/>:!available?<Empty title="No official findings yet." copy={String(data.reason)}/>:<>
+      <section className="panel findings-summary"><span className="eyebrow">EXECUTIVE FINDINGS · MEASURED</span><pre>{JSON.stringify(executive,null,2)}</pre></section>
+      <div className="compare-grid">{experiments.map(item=><article className="panel" key={String(item.experiment_id)}><span className="demo-label">LIVE EXPERIMENT</span><h3>{String(item.model)}</h3><small>{String(item.experiment_id)}</small><pre>{JSON.stringify(item.metrics,null,2)}</pre></article>)}</div>
+    </>}
+  </Page>;
+}
+
 function Methodology() {
   const topics=[
     ["Token surprisal","s(x) = −log p(x)","Provider-native log-probabilities only. Mirage disables this signal when unavailable."],
     ["Semantic entropy","H = −Σ p(c) log p(c)","Entropy over meaning clusters. The local fallback uses lexical Jaccard and is not neural NLI."],
+    ["Embedding equivalence","cos(a,b) ≥ τ","Local all-minilm cosine clustering stores the model, threshold, membership, and similarity matrix."],
     ["Expected Calibration Error","Σ (nᵦ/N) |riskᵦ − errorᵦ|","Compares bounded predicted error risk with observed incorrectness."],
     ["Brier score","(1/N) Σ (riskᵢ − errorᵢ)²","A proper scoring rule for probabilistic error predictions."],
     ["AUROC / AUPRC","ranking discrimination","Measures separation of incorrect and correct answers; AUPRC is important with rare errors."],
@@ -224,6 +246,7 @@ function Methodology() {
   return <Page eyebrow="METHODOLOGY" title="Transparent metrics, explicit assumptions." intro="Mirage evaluates correlations between signals and labelled errors. It does not infer truth from confidence alone.">
     <div className="method-cards">{topics.map(([title,formula,copy])=><article className="panel" key={title}><h3>{title}</h3><code>{formula}</code><p>{copy}</p></article>)}</div>
     <section className="panel limitations"><AlertTriangle/><div><h3>Required limitation</h3><p>Mirage does not determine whether an answer is factually correct solely from model uncertainty. It evaluates whether selected uncertainty and consistency signals correlate with labelled errors on a defined dataset. Results depend on the dataset, model, evaluator, prompt, and sampling configuration.</p></div></section>
+    <section className="panel references"><h3>Threats to validity</h3><p>Dataset size and composition, reference quality, model-selection bias, local hardware, sampling sensitivity, clustering errors, judge disagreement, self-verification unreliability, class imbalance, bootstrap assumptions, prompt dependence, and provider drift can all change conclusions.</p></section>
     <section className="panel references"><h3>Selected references</h3><ul><li>Kuhn et al., “Semantic Uncertainty: Linguistic Invariances for Uncertainty Estimation in Natural Language Generation” (2023).</li><li>Guo et al., “On Calibration of Modern Neural Networks” (2017).</li><li>Geifman and El-Yaniv, “Selective Classification for Deep Neural Networks” (2017).</li><li>Lin et al., “Teaching Models to Express Their Uncertainty in Words” (2022).</li></ul></section>
   </Page>;
 }
@@ -287,6 +310,7 @@ export default function App(){
   else if(view==="compare")content=<Compare experiments={experiments}/>;
   else if(view==="calibration")content=<CalibrationPage record={selected}/>;
   else if(view==="failures")content=<Failures record={selected} onUpdated={record=>{setSelected(record);refresh()}}/>;
+  else if(view==="findings")content=<Findings/>;
   else if(view==="reports")content=<Reports record={selected}/>;
   else if(view==="methodology")content=<Methodology/>;
   else content=<SettingsPage system={system}/>;

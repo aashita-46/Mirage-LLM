@@ -16,9 +16,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 SCHEMA_VERSION = "2.0"
+METRIC_VERSIONS = {
+    "classification": "2.1",
+    "calibration": "2.0",
+    "risk_coverage": "2.0",
+    "semantic_entropy": "2.1",
+}
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 DATASET_DIR = DATA_DIR / "datasets"
@@ -62,9 +68,16 @@ class DatasetExample(BaseModel):
     reference_answer: str | None = None
     acceptable_answers: list[str] = Field(default_factory=list)
     unanswerable: bool = False
+    answerability: Literal["answerable", "unanswerable", "false_premise", "ambiguous"] = "answerable"
     domain: str = "general"
     difficulty: Literal["easy", "medium", "hard"] = "medium"
     source: str
+    question_type: str = "factual"
+    source_name: str = ""
+    source_reference: str = ""
+    source_date: str = ""
+    verification_status: Literal["verified", "pending"] = "pending"
+    verification_notes: str = ""
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -90,6 +103,8 @@ class ProviderCapabilities(BaseModel):
     supports_logprobs: bool = False
     supports_seed: bool = True
     supports_streaming: bool = False
+    supports_parallel_samples: bool = False
+    supports_structured_output: bool = False
     supports_vision: bool = False
     supports_retrieval: bool = False
     supports_token_usage: bool = True
@@ -109,6 +124,9 @@ class SamplingConfig(BaseModel):
     max_tokens: int = Field(default=180, ge=8, le=2048)
     seed: int = 42
     semantic_samples: int = Field(default=6, ge=2, le=10)
+    timeout_seconds: float = Field(default=120, ge=1, le=600)
+    retry_count: int = Field(default=2, ge=0, le=8)
+    max_parallel_requests: int = Field(default=1, ge=1, le=16)
 
 
 class SignalConfig(BaseModel):
@@ -117,7 +135,9 @@ class SignalConfig(BaseModel):
     self_verification: bool = True
     token_uncertainty: bool = False
     retrieval_faithfulness: bool = False
-    clustering_method: Literal["lexical_fallback", "embedding", "nli"] = "lexical_fallback"
+    clustering_method: Literal["lexical_fallback", "embedding", "nli", "embedding_nli_hybrid"] = "lexical_fallback"
+    embedding_model: str = "all-minilm"
+    similarity_threshold: float = Field(default=0.78, ge=0, le=1)
     weights: dict[str, float] = Field(
         default_factory=lambda: {
             "semantic_entropy": 0.45,
@@ -148,6 +168,11 @@ class ExperimentConfig(BaseModel):
     evaluator: EvaluatorConfig = Field(default_factory=EvaluatorConfig)
     retrieval_enabled: bool = False
     retrieval_config: dict[str, Any] = Field(default_factory=dict)
+    verified_only: bool = True
+    max_examples: int | None = Field(default=None, ge=1, le=5000)
+    bootstrap_resamples: int = Field(default=1000, ge=0, le=10000)
+    bootstrap_seed: int = 42
+    experiment_group: str | None = None
 
 
 class GenerationRecord(BaseModel):
@@ -160,6 +185,7 @@ class GenerationRecord(BaseModel):
     estimated_cost: float | None = None
     provider_metadata: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
+    retry_count: int = 0
 
 
 class SemanticCluster(BaseModel):
@@ -271,6 +297,8 @@ class ExperimentRecord(BaseModel):
     git_commit: str | None = None
     results: list[ExampleResult]
     aggregates: AggregateMetrics | None = None
+    metric_versions: dict[str, str] = Field(default_factory=lambda: dict(METRIC_VERSIONS))
+    research_analysis: dict[str, Any] = Field(default_factory=dict)
 
 
 def normalise_text(value: str) -> str:
@@ -390,7 +418,11 @@ def consistency_signals(responses: list[str], clusters: list[SemanticCluster]) -
     normalised = [normalise_text(x) for x in responses]
     concentration = max((c.probability for c in clusters), default=0.0)
     numbers = [n for n in (extract_number(x) for x in responses) if n is not None]
-    entities = [set(re.findall(r"\b[A-Z][a-z]{2,}\b", x)) for x in responses]
+    ignored = {"The", "This", "That", "There", "It", "A", "An", "Answer"}
+    entities = [
+        {entity for entity in re.findall(r"\b(?:[A-Z][\w.-]*)(?:\s+[A-Z][\w.-]*)*\b", x) if entity not in ignored}
+        for x in responses
+    ]
     entity_union = set().union(*entities) if entities else set()
     entity_intersection = set.intersection(*entities) if entities else set()
     return {
@@ -430,13 +462,17 @@ def average_precision(labels: list[int], scores: list[float]) -> float | None:
     positives = sum(labels)
     if positives == 0:
         return None
-    ranked = sorted(zip(scores, labels), reverse=True)
-    hits, total = 0, 0.0
-    for rank, (_, label) in enumerate(ranked, 1):
-        if label:
-            hits += 1
-            total += hits / rank
-    return total / positives
+    thresholds = sorted(set(scores), reverse=True)
+    previous_recall, area = 0.0, 0.0
+    for threshold in thresholds:
+        predicted = [score >= threshold for score in scores]
+        true_positive = sum(label and selected for label, selected in zip(labels, predicted))
+        selected_count = sum(predicted)
+        recall = true_positive / positives
+        precision = true_positive / selected_count if selected_count else 1.0
+        area += (recall - previous_recall) * precision
+        previous_recall = recall
+    return area
 
 
 def calibration(labels: list[int], scores: list[float], bins: int = 10) -> tuple[float | None, float | None, float | None, list[dict[str, Any]]]:
@@ -531,7 +567,16 @@ def verification_from_cache(record: GenerationRecord) -> VerificationResult | No
     cached = record.provider_metadata.get("self_verification")
     if not cached:
         return None
-    return VerificationResult.model_validate({**cached, "source": "cached_model_self_verification"})
+    source = (
+        "cached_model_self_verification"
+        if record.provider_metadata.get("execution_mode") == "cached_demo"
+        else "live_model_self_verification"
+    )
+    try:
+        return VerificationResult.model_validate({**cached, "source": source})
+    except ValidationError as exc:
+        record.provider_metadata["self_verification_parsing_error"] = str(exc)
+        return None
 
 
 def failure_types(result: CorrectnessResult, risk: float | None, signals: SignalValues) -> list[str]:
@@ -548,7 +593,7 @@ def failure_types(result: CorrectnessResult, risk: float | None, signals: Signal
     return sorted(set(failures))
 
 
-def evaluate_example(example: DatasetExample, config: ExperimentConfig, provider: CachedDemoProvider) -> ExampleResult:
+def evaluate_example(example: DatasetExample, config: ExperimentConfig, provider: Any) -> ExampleResult:
     raw = provider.generate(example, config.sampling)
     if raw.error:
         empty_correctness = CorrectnessResult(
@@ -563,7 +608,20 @@ def evaluate_example(example: DatasetExample, config: ExperimentConfig, provider
             predicted_risk=None, risk_contributions={}, correctness=empty_correctness,
             failure_types=["tool_or_api_failure"], error_state=raw.error,
         )
-    clusters = semantic_clusters(raw.sampled_responses)
+    semantic_metadata: dict[str, Any]
+    if config.signals.clustering_method == "lexical_fallback":
+        clusters = semantic_clusters(raw.sampled_responses)
+        semantic_metadata = {
+            "method": "lexical_fallback_jaccard",
+            "threshold": config.signals.similarity_threshold,
+        }
+    else:
+        from api.semantics import cluster_responses
+        clusters, semantic_metadata = cluster_responses(
+            raw.sampled_responses, method=config.signals.clustering_method,
+            threshold=config.signals.similarity_threshold,
+            embedding_model=config.signals.embedding_model,
+        )
     entropy = entropy_from_clusters(clusters, len(raw.sampled_responses))
     consistency = consistency_signals(raw.sampled_responses, clusters)
     verification = verification_from_cache(raw)
@@ -590,8 +648,9 @@ def evaluate_example(example: DatasetExample, config: ExperimentConfig, provider
         trace={
             "schema_version": SCHEMA_VERSION,
             "raw_output_sha256": hashlib.sha256(raw.response.encode()).hexdigest(),
-            "clustering_method": "lexical_fallback_jaccard",
+            "clustering": semantic_metadata,
             "correctness_method": judged.method,
+            "metric_versions": METRIC_VERSIONS,
         },
     )
 
@@ -655,9 +714,11 @@ def aggregate(results: list[ExampleResult]) -> AggregateMetrics:
     )
 
 
-def run_experiment(config: ExperimentConfig, git_commit: str | None = None) -> ExperimentRecord:
+def run_experiment(config: ExperimentConfig, git_commit: str | None = None, provider: Any | None = None) -> ExperimentRecord:
     manifest = load_manifest(config.dataset_name)
-    provider = CachedDemoProvider()
+    if provider is None:
+        from api.providers import provider_for
+        provider = provider_for(config.provider, config.model)
     identity = {
         "schema": SCHEMA_VERSION,
         "dataset": [manifest.name, manifest.version],
@@ -666,7 +727,13 @@ def run_experiment(config: ExperimentConfig, git_commit: str | None = None) -> E
     experiment_id = stable_id("exp", identity)
     created = utc_now()
     logger.info("experiment.started id=%s dataset=%s examples=%d", experiment_id, manifest.name, len(manifest.examples))
-    results = [evaluate_example(example, config, provider) for example in manifest.examples]
+    examples = [
+        example for example in manifest.examples
+        if not config.verified_only or manifest.demonstration or example.verification_status == "verified"
+    ]
+    if config.max_examples:
+        examples = examples[:config.max_examples]
+    results = [evaluate_example(example, config, provider) for example in examples]
     failed = sum(bool(result.error_state) for result in results)
     state = "failed" if failed == len(results) else ("partially_complete" if failed else "completed")
     record = ExperimentRecord(

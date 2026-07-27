@@ -2,9 +2,15 @@ export type ProviderCapabilities = {
   supports_logprobs: boolean;
   supports_seed: boolean;
   supports_streaming: boolean;
+  supports_parallel_samples: boolean;
+  supports_structured_output: boolean;
   supports_vision: boolean;
   supports_retrieval: boolean;
   supports_token_usage: boolean;
+};
+export type ProviderModel = {
+  provider:string;model:string;mode:string;available?:boolean;unavailable_reason?:string;
+  capabilities:ProviderCapabilities;
 };
 
 export type DatasetExample = {

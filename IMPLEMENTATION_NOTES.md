@@ -58,3 +58,26 @@ GitHub publication and Vercel deployment were authorised after the local review.
 - Repeated dataset uploads receive incremented versions instead of overwriting the
   original manifest.
 - The UI exposes experiment deletion and correctness override controls.
+
+## Research iteration audit and implementation (2026-07-27)
+
+- Corrected tie-dependent average precision and versioned classification metrics as
+  `2.1`.
+- Replaced the sentence-initial-capital entity heuristic with a narrower
+  multi-token-capital extraction rule.
+- Added live Ollama and generic OpenAI-compatible providers with redaction,
+  capabilities, bounded retries, timeouts, usage, and partial-error traces.
+- Added genuine local embedding clustering through Ollama `all-minilm`; lexical
+  Jaccard remains an explicit fallback.
+- Added Mirage Reliability Set v1 from pinned TruthfulQA and SQuAD 2.0 gold records,
+  plus an honest validation report. No generated question was marked verified.
+- Added bootstrap intervals, paired bootstrap signal differences, stratified Platt
+  scaling, and isotonic calibration.
+- Added incremental per-example saves, resume, failed-example reruns, and stale
+  configuration separation through deterministic IDs.
+- Added the Findings API/page and a non-generative Markdown research-report builder.
+- Completed a genuine three-example `phi:latest` Ollama smoke experiment. It is not
+  presented as the official 200-example study.
+- Docker execution remains unverified because Docker Desktop is not running.
+- The official three-model, 200-example research configuration exists but is not
+  claimed as completed.

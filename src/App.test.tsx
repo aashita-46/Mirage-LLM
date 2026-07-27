@@ -8,6 +8,10 @@ beforeEach(() => {
       ? { status: "ok", mode: "local_research", schema_version: "2.0" }
       : url.includes("/system")
         ? { mode: "local_research", token_uncertainty: "unavailable_without_provider_logprobs" }
+        : url.includes("/models")
+          ? { models: [{provider:"cached_demo",model:"mirage/cached-research-samples",mode:"cached_demo",available:true,capabilities:{}}] }
+        : url.includes("/findings")
+          ? { available:false,reason:"No genuine live experiment records exist for this group.",experiments:[] }
         : url.includes("/datasets")
           ? { datasets: [] }
           : { experiments: [] };
@@ -54,4 +58,11 @@ test("credits both builders with profile links", () => {
   expect(screen.getByRole("link", { name: "Aashita Jolly on GitHub" })).toHaveAttribute(
     "href", "https://github.com/aashita-46",
   );
+});
+
+test("findings page refuses to invent absent research results", async () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "Findings" }));
+  await waitFor(() => expect(screen.getByText("No official findings yet.")).toBeInTheDocument());
+  expect(screen.getByText(/No genuine live experiment records/i)).toBeInTheDocument();
 });

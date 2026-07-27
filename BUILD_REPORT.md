@@ -116,3 +116,25 @@ Run the CLI experiment with:
    split only.
 6. Measure coverage at target accuracy and review-budget outcomes with confidence
    intervals.
+
+## Research iteration addendum
+
+The repository now includes genuine Ollama and OpenAI-compatible adapters, local
+`all-minilm` embedding clustering, a 200-item provenance-aware reliability set,
+bootstrap and paired comparisons, held-out calibration, resumable execution,
+Findings, and generated research reporting.
+
+Measured live smoke result:
+
+- experiment: `exp_2beb036aeb04eac1`
+- provider/model: `ollama/phi:latest`
+- examples: 3 verified source-gold items
+- samples: 2 per example
+- accuracy: 0.000 under the deterministic evaluator
+- AUPRC: 1.000 because every observed item was an error
+- AUROC: undefined because only one class was present
+- mean latency: 59.647 seconds per example
+
+This is a pipeline smoke test, not a research conclusion. The result identifies a
+real unresolved issue: open-ended TruthfulQA answers need human review or a validated
+judge rather than relying exclusively on strict deterministic matching.

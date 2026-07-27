@@ -150,3 +150,18 @@ def test_experiment_api_and_export():
     exported = client.get(f"/api/v1/experiments/{record['experiment_id']}/export?format=csv")
     assert exported.status_code == 200
     assert "example_id,question" in exported.text
+
+
+def test_live_model_discovery_and_dataset_report():
+    models = client.get("/api/v1/models")
+    assert models.status_code == 200
+    assert any(item["provider"] == "ollama" for item in models.json()["models"])
+    report = client.get("/api/v1/datasets/mirage-reliability-set-v1/report")
+    assert report.status_code == 200
+    assert report.json()["verified_examples"] == 200
+
+
+def test_findings_are_absent_without_official_live_group():
+    payload = client.get("/api/v1/findings/research-v1").json()
+    assert payload["available"] is False
+    assert payload["experiments"] == []

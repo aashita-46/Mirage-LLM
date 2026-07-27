@@ -117,23 +117,30 @@ def system() -> dict[str, Any]:
 @app.get("/api/v1/models")
 def models() -> dict[str, Any]:
     cached = CachedDemoProvider().info
+    live_models: list[dict[str, Any]] = []
+    try:
+        from api.providers import OllamaProvider
+        probe = OllamaProvider(model="")
+        for model in probe.available_models():
+            if model != "all-minilm:latest":
+                provider = OllamaProvider(model)
+                live_models.append({**provider.info.model_dump(), "available": True})
+    except Exception as exc:
+        live_models.append({
+            "provider": "ollama", "model": "unavailable", "mode": "live",
+            "available": False, "unavailable_reason": str(exc), "capabilities": {},
+        })
+    from api.providers import OpenAICompatibleProvider
+    compatible = OpenAICompatibleProvider()
     return {
         "models": [
-            cached.model_dump(),
+            {**cached.model_dump(), "available": True},
+            *live_models,
             {
-                "provider": "huggingface",
-                "model": "configurable-local-model",
+                **compatible.info.model_dump(),
                 "mode": "live",
-                "available": False,
-                "unavailable_reason": "No live local provider is configured in this CPU-only iteration.",
-                "capabilities": {
-                    "supports_logprobs": True,
-                    "supports_seed": True,
-                    "supports_streaming": True,
-                    "supports_vision": False,
-                    "supports_retrieval": False,
-                    "supports_token_usage": True,
-                },
+                "available": bool(compatible.base_url and compatible.model),
+                "unavailable_reason": None if compatible.base_url and compatible.model else "Configure OPENAI_COMPATIBLE_BASE_URL and OPENAI_COMPATIBLE_MODEL.",
             },
         ]
     }
@@ -267,6 +274,15 @@ def dataset_detail(name: str) -> DatasetManifest:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@app.get("/api/v1/datasets/{name}/report")
+def dataset_validation_report(name: str) -> dict[str, Any]:
+    from api.dataset_tools import dataset_report
+    try:
+        return dataset_report(load_manifest(name))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 def parse_upload(upload: DatasetUpload) -> list[dict[str, Any]]:
     try:
         if upload.filename.lower().endswith(".jsonl"):
@@ -341,17 +357,16 @@ def save_dataset(upload: DatasetUpload) -> dict[str, Any]:
 
 @app.post("/api/v1/experiments", response_model=ExperimentRecord)
 def create_experiment(config: ExperimentConfig) -> ExperimentRecord:
-    if config.provider != "cached_demo":
-        raise HTTPException(status_code=422, detail="Only the clearly labelled cached_demo provider is configured locally.")
+    if config.provider not in {"cached_demo", "ollama", "openai_compatible"}:
+        raise HTTPException(status_code=422, detail=f"Unsupported provider: {config.provider}.")
     manifest = load_manifest(config.dataset_name)
     if config.dataset_version != manifest.version:
         raise HTTPException(
             status_code=422,
             detail=f"Dataset version mismatch: requested {config.dataset_version}, available {manifest.version}.",
         )
-    record = run_experiment(config)
-    store.save(record)
-    return record
+    from api.research import run_resumable
+    return run_resumable(config, store)
 
 
 @app.get("/api/v1/experiments")
@@ -541,3 +556,9 @@ def stress(req: StressRequest) -> dict[str, Any]:
 def examples() -> dict[str, Any]:
     manifest = load_manifest()
     return {"examples": [example.question for example in manifest.examples[:8]], "dataset": manifest.name}
+
+
+@app.get("/api/v1/findings/{experiment_group}")
+def findings(experiment_group: str) -> dict[str, Any]:
+    from api.research import findings_for_group
+    return findings_for_group(store.list(), experiment_group)

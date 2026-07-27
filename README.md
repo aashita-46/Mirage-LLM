@@ -1,4 +1,4 @@
-# Mirage
+# MirageEval: A Local-First Platform for LLM Reliability, Uncertainty and Selective Prediction
 
 > **Mirage is an evaluation platform for measuring, visualising, and comparing
 > uncertainty, calibration, consistency, and factual reliability in large language
@@ -11,6 +11,42 @@ selective-prediction analysis, failure exploration, and reproducible exports.
 
 Mirage is not a truth oracle and is not positioned as a guaranteed hallucination
 detector.
+
+## Current capabilities
+
+- Genuine local Ollama evaluation with discovered installed models
+- Generic OpenAI-compatible chat-completions provider
+- Raw response, sampling, latency, usage, error, and provider trace storage
+- Local `all-minilm` embedding clustering with saved cosine-similarity matrices
+- Explicit lexical Jaccard fallback
+- A 200-item provenance-aware, source-gold-labelled reliability set
+- Dataset integrity and balance reports
+- Resumable per-example experiment execution and failed-example reruns
+- Bootstrap confidence intervals and paired signal comparisons
+- Held-out Platt and isotonic calibration
+- Data-derived Findings API/page and Markdown research-report generation
+
+## Demonstration mode
+
+The original 18-item cached demonstration remains available for a fast tour. Cached
+responses are stored separately from live outputs and always carry
+`execution_mode=cached_demo`. They are not current inference or benchmark evidence.
+
+## Research results
+
+One genuine local smoke experiment has been completed with `phi:latest`, Ollama,
+local `all-minilm` clustering, three verified examples, and two sampled responses per
+example. It measured 0/3 deterministic accuracy, mean latency 59.6 seconds per
+example, and no valid AUROC because all three answers were labelled incorrect.
+
+| Experiment | Model | N | Accuracy | AUROC | AUPRC | Status |
+|---|---|---:|---:|---:|---:|---|
+| `exp_2beb036aeb04eac1` | `phi:latest` | 3 | 0.000 | N/A | 1.000 | live smoke only |
+
+This run validates the live execution path; it does not answer the research question.
+The full 200-example, three-model configuration is
+[`config/research-experiment-v1.json`](config/research-experiment-v1.json) and has
+not been represented as completed.
 
 ## Research motivation
 
@@ -201,15 +237,16 @@ Every provider declares:
 supports_logprobs: bool
 supports_seed: bool
 supports_streaming: bool
+supports_parallel_samples: bool
+supports_structured_output: bool
 supports_vision: bool
 supports_retrieval: bool
 supports_token_usage: bool
 ```
 
-The local iteration implements a cached demonstration provider. Its output records
-are real repository data, but no current model inference is claimed. The abstraction
-supports adding OpenAI-compatible APIs, Ollama, Hugging Face, or other hosted
-providers without changing the evaluation schema.
+The local iteration implements cached-demo, Ollama, and generic OpenAI-compatible
+providers. API keys are read server-side and never stored in experiment metadata,
+errors, exports, or frontend responses.
 
 ## Local installation
 
@@ -272,6 +309,17 @@ Or:
 
 ```bash
 python scripts/evaluate.py --name "My study" --samples 8 --export markdown
+```
+
+Live resumable research commands:
+
+```bash
+ollama pull all-minilm
+python scripts/dataset_stats.py mirage-reliability-set-v1
+python scripts/evaluate.py --config config/live-smoke-v1.json
+python scripts/evaluate.py --config config/research-experiment-v1.json --resume
+python scripts/evaluate.py --experiment-id EXPERIMENT_ID --rerun-failed
+python scripts/generate_research_report.py --experiment-group research-v1
 ```
 
 Exports are written to `data/exports/`.
@@ -378,15 +426,24 @@ store actionable professional medical or legal advice as a casual benchmark.
 
 ## Limitations
 
-- The bundled provider reads cached outputs; it does not run a current LLM.
-- Lexical grouping is weaker than embedding or bidirectional NLI equivalence.
+- Only the small smoke study has completed; the 200-example three-model study remains
+  computationally expensive on this six-core CPU.
+- The new reliability set uses source benchmark gold annotations and has not received
+  independent item-by-item Mirage review.
+- Its current 80% answerable / 20% unanswerable balance misses the intended design
+  targets and contains no verified false-premise or ambiguous slice.
+- Domain mapping is coarse and the technology slice is absent.
+- Deterministic evaluation is too strict for some open-ended TruthfulQA answers;
+  disputed examples require human review or a carefully validated judge.
+- Embedding grouping is materially stronger than lexical overlap but is not
+  bidirectional NLI and can still merge or split meanings incorrectly.
 - Self-verification is a model-derived signal and may be confidently wrong.
 - The starter dataset is too small for strong calibration conclusions.
 - No live retrieval provider is configured, so retrieval faithfulness is unavailable.
 - No token log-probabilities are available from the cached provider.
 - The experimental composite score is configurable but not universally validated.
-- Calibration fitting and train/validation splitting are schema-ready future work;
-  no fitted calibrator is claimed in this iteration.
+- Platt and isotonic fitting use disjoint stratified indices, but calibration remains
+  unstable for small or highly imbalanced error sets.
 - Results are conditional on dataset, provider outputs, evaluator, prompts, decoding,
   and sampling configuration.
 
@@ -407,8 +464,10 @@ If Mirage supports research or teaching work, cite the repository and record the
 experiment schema version, dataset version, configuration export, and commit hash.
 
 ```bibtex
-@software{mirage_reliability_evaluation,
-  title = {Mirage: LLM Reliability Evaluation Platform},
+@software{mirageeval2026,
+  title = {MirageEval: A Local-First Platform for LLM Reliability, Uncertainty and Selective Prediction},
+  author = {Ninad Naik and Aashita Jolly},
+  year = {2026},
   url = {https://github.com/aashita-46/Mirage-LLM},
   version = {2.0}
 }

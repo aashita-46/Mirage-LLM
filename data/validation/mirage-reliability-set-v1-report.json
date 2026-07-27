@@ -1,0 +1,273 @@
+{
+  "dataset": "mirage-reliability-set-v1",
+  "version": "1.0",
+  "total_examples": 200,
+  "verified_examples": 200,
+  "pending_examples": 0,
+  "domain_distribution": {
+    "general": 134,
+    "geography": 9,
+    "finance": 9,
+    "literature": 16,
+    "medicine": 12,
+    "history": 4,
+    "law": 4,
+    "science": 12
+  },
+  "difficulty_distribution": {
+    "medium": 160,
+    "hard": 40
+  },
+  "answerability_distribution": {
+    "answerable": 160,
+    "unanswerable": 40
+  },
+  "question_type_distribution": {
+    "truthfulness_stress": 160,
+    "context_unanswerable": 40
+  },
+  "missing_source_count": 0,
+  "duplicate_ids": [],
+  "duplicate_questions": [],
+  "highly_similar_questions": [
+    {
+      "first": "mrs_squad_unanswerable_001",
+      "second": "mrs_squad_unanswerable_002",
+      "similarity": 0.9333333333333333
+    },
+    {
+      "first": "mrs_squad_unanswerable_001",
+      "second": "mrs_squad_unanswerable_003",
+      "similarity": 0.9545454545454546
+    },
+    {
+      "first": "mrs_squad_unanswerable_001",
+      "second": "mrs_squad_unanswerable_004",
+      "similarity": 0.9333333333333333
+    },
+    {
+      "first": "mrs_squad_unanswerable_002",
+      "second": "mrs_squad_unanswerable_003",
+      "similarity": 0.9545454545454546
+    },
+    {
+      "first": "mrs_squad_unanswerable_002",
+      "second": "mrs_squad_unanswerable_004",
+      "similarity": 0.9333333333333333
+    },
+    {
+      "first": "mrs_squad_unanswerable_003",
+      "second": "mrs_squad_unanswerable_004",
+      "similarity": 0.9770114942528736
+    },
+    {
+      "first": "mrs_squad_unanswerable_005",
+      "second": "mrs_squad_unanswerable_006",
+      "similarity": 0.9594594594594594
+    },
+    {
+      "first": "mrs_squad_unanswerable_005",
+      "second": "mrs_squad_unanswerable_007",
+      "similarity": 0.9466666666666667
+    },
+    {
+      "first": "mrs_squad_unanswerable_005",
+      "second": "mrs_squad_unanswerable_008",
+      "similarity": 0.9466666666666667
+    },
+    {
+      "first": "mrs_squad_unanswerable_005",
+      "second": "mrs_squad_unanswerable_009",
+      "similarity": 0.9664429530201343
+    },
+    {
+      "first": "mrs_squad_unanswerable_006",
+      "second": "mrs_squad_unanswerable_007",
+      "similarity": 0.9862068965517241
+    },
+    {
+      "first": "mrs_squad_unanswerable_006",
+      "second": "mrs_squad_unanswerable_008",
+      "similarity": 0.9862068965517241
+    },
+    {
+      "first": "mrs_squad_unanswerable_006",
+      "second": "mrs_squad_unanswerable_009",
+      "similarity": 0.9659863945578231
+    },
+    {
+      "first": "mrs_squad_unanswerable_007",
+      "second": "mrs_squad_unanswerable_008",
+      "similarity": 0.9727891156462585
+    },
+    {
+      "first": "mrs_squad_unanswerable_007",
+      "second": "mrs_squad_unanswerable_009",
+      "similarity": 0.9530201342281879
+    },
+    {
+      "first": "mrs_squad_unanswerable_008",
+      "second": "mrs_squad_unanswerable_009",
+      "similarity": 0.9530201342281879
+    },
+    {
+      "first": "mrs_squad_unanswerable_012",
+      "second": "mrs_squad_unanswerable_013",
+      "similarity": 0.9464285714285714
+    },
+    {
+      "first": "mrs_squad_unanswerable_012",
+      "second": "mrs_squad_unanswerable_014",
+      "similarity": 0.9380530973451328
+    },
+    {
+      "first": "mrs_squad_unanswerable_012",
+      "second": "mrs_squad_unanswerable_015",
+      "similarity": 0.9385964912280702
+    },
+    {
+      "first": "mrs_squad_unanswerable_013",
+      "second": "mrs_squad_unanswerable_014",
+      "similarity": 0.954954954954955
+    },
+    {
+      "first": "mrs_squad_unanswerable_013",
+      "second": "mrs_squad_unanswerable_015",
+      "similarity": 0.9553571428571429
+    },
+    {
+      "first": "mrs_squad_unanswerable_014",
+      "second": "mrs_squad_unanswerable_015",
+      "similarity": 0.9298245614035088
+    },
+    {
+      "first": "mrs_squad_unanswerable_016",
+      "second": "mrs_squad_unanswerable_017",
+      "similarity": 0.9270833333333334
+    },
+    {
+      "first": "mrs_squad_unanswerable_018",
+      "second": "mrs_squad_unanswerable_019",
+      "similarity": 0.9696969696969697
+    },
+    {
+      "first": "mrs_squad_unanswerable_018",
+      "second": "mrs_squad_unanswerable_020",
+      "similarity": 0.9846153846153847
+    },
+    {
+      "first": "mrs_squad_unanswerable_019",
+      "second": "mrs_squad_unanswerable_020",
+      "similarity": 0.9552238805970149
+    },
+    {
+      "first": "mrs_squad_unanswerable_021",
+      "second": "mrs_squad_unanswerable_023",
+      "similarity": 0.9647058823529412
+    },
+    {
+      "first": "mrs_squad_unanswerable_022",
+      "second": "mrs_squad_unanswerable_023",
+      "similarity": 0.9213483146067416
+    },
+    {
+      "first": "mrs_squad_unanswerable_024",
+      "second": "mrs_squad_unanswerable_025",
+      "similarity": 0.9767441860465116
+    },
+    {
+      "first": "mrs_squad_unanswerable_024",
+      "second": "mrs_squad_unanswerable_026",
+      "similarity": 0.9767441860465116
+    },
+    {
+      "first": "mrs_squad_unanswerable_024",
+      "second": "mrs_squad_unanswerable_027",
+      "similarity": 0.9325842696629213
+    },
+    {
+      "first": "mrs_squad_unanswerable_025",
+      "second": "mrs_squad_unanswerable_026",
+      "similarity": 0.9770114942528736
+    },
+    {
+      "first": "mrs_squad_unanswerable_025",
+      "second": "mrs_squad_unanswerable_027",
+      "similarity": 0.9550561797752809
+    },
+    {
+      "first": "mrs_squad_unanswerable_026",
+      "second": "mrs_squad_unanswerable_027",
+      "similarity": 0.9333333333333333
+    },
+    {
+      "first": "mrs_squad_unanswerable_028",
+      "second": "mrs_squad_unanswerable_029",
+      "similarity": 0.9358974358974359
+    },
+    {
+      "first": "mrs_squad_unanswerable_028",
+      "second": "mrs_squad_unanswerable_030",
+      "similarity": 0.9367088607594937
+    },
+    {
+      "first": "mrs_squad_unanswerable_029",
+      "second": "mrs_squad_unanswerable_031",
+      "similarity": 0.9620253164556962
+    },
+    {
+      "first": "mrs_squad_unanswerable_032",
+      "second": "mrs_squad_unanswerable_033",
+      "similarity": 0.9690721649484536
+    },
+    {
+      "first": "mrs_squad_unanswerable_032",
+      "second": "mrs_squad_unanswerable_034",
+      "similarity": 0.96875
+    },
+    {
+      "first": "mrs_squad_unanswerable_032",
+      "second": "mrs_squad_unanswerable_035",
+      "similarity": 0.9587628865979382
+    },
+    {
+      "first": "mrs_squad_unanswerable_033",
+      "second": "mrs_squad_unanswerable_034",
+      "similarity": 0.9393939393939394
+    },
+    {
+      "first": "mrs_squad_unanswerable_033",
+      "second": "mrs_squad_unanswerable_035",
+      "similarity": 0.9494949494949495
+    },
+    {
+      "first": "mrs_squad_unanswerable_034",
+      "second": "mrs_squad_unanswerable_035",
+      "similarity": 0.9489795918367347
+    },
+    {
+      "first": "mrs_squad_unanswerable_037",
+      "second": "mrs_squad_unanswerable_038",
+      "similarity": 0.953125
+    },
+    {
+      "first": "mrs_squad_unanswerable_039",
+      "second": "mrs_squad_unanswerable_040",
+      "similarity": 0.9738219895287958
+    }
+  ],
+  "conflicting_reference_answers": [],
+  "duplicate_reference_answer_count": 17,
+  "answer_leakage_ids": [],
+  "official_metric_eligible": 200,
+  "warnings": [
+    "Answerable share is outside the 60\u201370% design target.",
+    "Unanswerable share is outside the 10\u201315% design target.",
+    "False-premise share is outside the 10\u201315% design target.",
+    "Ambiguous share is outside the 5\u201310% design target."
+  ],
+  "source_urls": [
+    "https://raw.githubusercontent.com/sylinrl/TruthfulQA/013686a06be7a7bde5bf8223943e106c7250123c/TruthfulQA.csv",
+    "https://rajpurkar.github.io/SQuAD-explorer/dataset/dev-v2.0.json"
+  ]
+}

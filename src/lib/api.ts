@@ -1,4 +1,4 @@
-import type { Analysis, DatasetManifest, DatasetSummary, ExperimentRecord, ExperimentSummary } from "../types";
+import type { Analysis, DatasetManifest, DatasetSummary, ExperimentRecord, ExperimentSummary, ProviderModel } from "../types";
 const base = import.meta.env.VITE_API_BASE_URL ?? "";
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -17,7 +17,7 @@ const post = <T>(path:string, body:unknown) => request<T>(path,{method:"POST",bo
 export const api = {
   health: () => request<{status:string;mode:string;schema_version:string}>("/api/v1/health"),
   system: () => request<Record<string,unknown>>("/api/v1/system"),
-  models: () => request<{models:Record<string,unknown>[]}>("/api/v1/models"),
+  models: () => request<{models:ProviderModel[]}>("/api/v1/models"),
   analyse: (question:string, reference_answer:string, sample_count:number, temperature:number) =>
     post<Analysis>("/api/v1/analyse",{question,reference_answer:reference_answer||null,sample_count,temperature,top_p:.9}),
   datasets: () => request<{datasets:DatasetSummary[]}>("/api/v1/datasets"),
@@ -35,4 +35,5 @@ export const api = {
     post<ExperimentRecord>(`/api/v1/experiments/${experimentId}/examples/${exampleId}/override`,{human_label,note}),
   compare: (ids:string[]) => post<{experiments:Record<string,unknown>[]}>("/api/v1/experiments/compare",{experiment_ids:ids}),
   exportUrl: (id:string,format:string) => `${base}/api/v1/experiments/${id}/export?format=${format}`,
+  findings: (group="research-v1") => request<Record<string,unknown>>(`/api/v1/findings/${group}`),
 };
