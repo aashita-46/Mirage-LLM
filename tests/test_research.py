@@ -4,7 +4,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from api.core import DatasetExample, ExperimentConfig, ExperimentStore, GenerationRecord, ModelInfo, ProviderCapabilities, average_precision, roc_auc
+from api.core import DatasetExample, ExperimentConfig, ExperimentStore, GenerationRecord, ModelInfo, ProviderCapabilities, average_precision, git_provenance, roc_auc
 from api.core import DatasetManifest, load_manifest
 from api.dataset_tools import dataset_report
 from api.providers import OllamaProvider, OpenAICompatibleProvider, ProviderError, redact
@@ -237,6 +237,26 @@ def test_resumable_experiment_skips_completed_examples(tmp_path: Path):
 
 def test_configuration_change_produces_distinct_identity():
     assert experiment_identity(ExperimentConfig(model="a"), "1") != experiment_identity(ExperimentConfig(model="b"), "1")
+
+
+def test_git_provenance_uses_vercel_sha_and_survives_missing_git(monkeypatch):
+    monkeypatch.setenv("VERCEL_GIT_COMMIT_SHA", "deployment-sha")
+    assert git_provenance() == {
+        "commit": "deployment-sha", "dirty": False,
+        "source": "vercel_environment", "warning": None,
+    }
+    monkeypatch.delenv("VERCEL_GIT_COMMIT_SHA")
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+
+    def missing_git(*args, **kwargs):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr("api.core.subprocess.run", missing_git)
+    result = git_provenance()
+    assert result["commit"] is None
+    assert result["dirty"] is None
+    assert result["source"] == "unavailable"
+    assert result["warning"]
 
 
 def test_report_generator_does_not_invent_missing_findings():

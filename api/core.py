@@ -788,9 +788,30 @@ def configuration_fingerprint(config: ExperimentConfig, dataset_sha256: str) -> 
 
 
 def git_provenance() -> dict[str, Any]:
+    deployment_commit = os.getenv("VERCEL_GIT_COMMIT_SHA") or os.getenv("GITHUB_SHA")
+    if deployment_commit:
+        return {
+            "commit": deployment_commit,
+            "dirty": False,
+            "source": "vercel_environment" if os.getenv("VERCEL_GIT_COMMIT_SHA") else "github_environment",
+            "warning": None,
+        }
+
     def run(*args: str) -> str:
         return subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, check=False).stdout.strip()
-    return {"commit": run("rev-parse", "HEAD") or None, "dirty": bool(run("status", "--porcelain"))}
+
+    try:
+        commit = run("rev-parse", "HEAD") or None
+        dirty = bool(run("status", "--porcelain"))
+        return {"commit": commit, "dirty": dirty, "source": "local_git", "warning": None}
+    except (FileNotFoundError, OSError) as exc:
+        logger.warning("provenance.git_unavailable error=%s", type(exc).__name__)
+        return {
+            "commit": None,
+            "dirty": None,
+            "source": "unavailable",
+            "warning": "Git provenance is unavailable in this runtime.",
+        }
 
 
 def run_experiment(config: ExperimentConfig, git_commit: str | None = None, provider: Any | None = None) -> ExperimentRecord:
