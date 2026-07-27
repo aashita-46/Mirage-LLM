@@ -43,3 +43,15 @@ test("requires at least one enabled uncertainty signal", async () => {
   expect(screen.getByRole("button", { name: "Run evaluation" })).toBeDisabled();
   expect(screen.getByText("Enable at least one available signal.")).toBeInTheDocument();
 });
+
+test("credits both builders with profile links", () => {
+  render(<App />);
+  expect(screen.getByRole("heading", { name: "Ninad Naik" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Aashita Jolly" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Ninad Naik on LinkedIn" })).toHaveAttribute(
+    "href", "https://www.linkedin.com/in/ninad-naik-274883262",
+  );
+  expect(screen.getByRole("link", { name: "Aashita Jolly on GitHub" })).toHaveAttribute(
+    "href", "https://github.com/aashita-46",
+  );
+});

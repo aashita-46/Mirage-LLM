@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import {
   Activity, AlertTriangle, ArrowRight, BarChart3, Beaker, BookOpen, Boxes, BrainCircuit,
   CheckCircle2, ChevronRight, CircleGauge, Code2, Database, Download, FileJson, FlaskConical,
-  Gauge, Github, Layers3, Menu, Play, RefreshCw, Scale, Search, Settings, ShieldAlert,
+  Gauge, Github, Layers3, Linkedin, Menu, Play, RefreshCw, Scale, Search, Settings, ShieldAlert,
   SlidersHorizontal, Table2, Trash2, Upload, X, XCircle
 } from "lucide-react";
 import {
@@ -247,6 +247,31 @@ function RiskCoverage({metrics}:{metrics:AggregateMetrics}){return <article clas
 function SignalTable({metrics}:{metrics:AggregateMetrics}){return <div className="responsive-table"><table><thead><tr><th>Signal</th><th>Coverage</th><th>AUROC</th><th>AUPRC</th><th>ECE</th><th>Brier</th></tr></thead><tbody>{metrics.signal_comparison.map(x=><tr key={x.signal}><td>{titleCase(x.signal)}</td><td>{pct(x.coverage)}</td><td>{num(x.auroc)}</td><td>{num(x.auprc)}</td><td>{num(x.ece)}</td><td>{num(x.brier)}</td></tr>)}</tbody></table></div>}
 function ResultTable({results}:{results:ExampleResult[]}){return <div className="responsive-table"><table><thead><tr><th>Example</th><th>Domain</th><th>Correct</th><th>Risk</th><th>Signals</th><th>Failure</th></tr></thead><tbody>{results.map(x=><tr key={x.example_id}><td><b>{x.example_id}</b><small>{x.question}</small></td><td>{x.domain}</td><td>{String(x.correctness.human_label??x.correctness.correct)}</td><td>{pct(x.predicted_risk)}</td><td>{Object.entries(x.signals).filter(([,v])=>typeof v==="number").slice(0,2).map(([k,v])=><small key={k}>{titleCase(k)} {Number(v).toFixed(2)}</small>)}</td><td>{x.failure_types.map(titleCase).join(", ")||"—"}</td></tr>)}</tbody></table></div>}
 
+function Builders() {
+  const builders = [
+    {
+      name:"Ninad Naik",role:"Builder · Engineering & Product",
+      image:"/builders/ninad-naik.jpg",
+      linkedin:"https://www.linkedin.com/in/ninad-naik-274883262",
+      github:"https://github.com/ninadnaik03",
+    },
+    {
+      name:"Aashita Jolly",role:"Builder · Research & Experience",
+      image:"/builders/aashita-jolly.jpg",
+      linkedin:"https://www.linkedin.com/in/aashita-jolly",
+      github:"https://github.com/aashita-46",
+    },
+  ];
+  return <section className="builders-section" aria-labelledby="builders-title">
+    <div className="builders-intro"><span className="eyebrow">THE PEOPLE BEHIND MIRAGE</span><h2 id="builders-title">Built with curiosity.<br/><em>Measured with care.</em></h2><p>Mirage is shaped by a shared belief that model reliability should be observable, reproducible, and honest.</p></div>
+    <div className="builder-grid">{builders.map((builder,index)=><article className="builder-card" key={builder.name}>
+      <div className="builder-number">0{index+1}</div>
+      <div className="builder-photo"><img src={builder.image} alt={`${builder.name}, Mirage builder`} loading="lazy"/></div>
+      <div className="builder-copy"><span>{builder.role}</span><h3>{builder.name}</h3><div className="builder-links"><a href={builder.linkedin} target="_blank" rel="noreferrer" aria-label={`${builder.name} on LinkedIn`}><Linkedin/> LinkedIn</a><a href={builder.github} target="_blank" rel="noreferrer" aria-label={`${builder.name} on GitHub`}><Github/> GitHub</a></div></div>
+    </article>)}</div>
+  </section>;
+}
+
 export default function App(){
   const [view,setView]=useState<View>("overview"),[online,setOnline]=useState(false);
   const [system,setSystem]=useState<Record<string,unknown>>({}),[experiments,setExperiments]=useState<ExperimentSummary[]>([]);
@@ -265,5 +290,5 @@ export default function App(){
   else if(view==="reports")content=<Reports record={selected}/>;
   else if(view==="methodology")content=<Methodology/>;
   else content=<SettingsPage system={system}/>;
-  return <><Navigation view={view} setView={v=>{if(v==="experiments")setSelected(null);setView(v)}} online={online}/>{content}<footer><div className="brand"><span className="brand-mark"/><b>MIRAGE</b></div><p>Open evaluation infrastructure for studying LLM reliability—not a truth oracle.</p><a href="https://github.com/aashita-46/Mirage-LLM"><Github/> Source</a></footer></>;
+  return <><Navigation view={view} setView={v=>{if(v==="experiments")setSelected(null);setView(v)}} online={online}/>{content}<Builders/><footer><div className="brand"><span className="brand-mark"/><b>MIRAGE</b></div><p>Open evaluation infrastructure for studying LLM reliability—not a truth oracle.</p><a href="https://github.com/aashita-46/Mirage-LLM"><Github/> Source</a></footer></>;
 }
