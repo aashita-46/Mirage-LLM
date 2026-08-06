@@ -1,509 +1,79 @@
-# MirageEval: A Local-First Platform for LLM Reliability, Uncertainty and Selective Prediction
+# ATC Guardian
 
-> **Mirage is an evaluation platform for measuring, visualising, and comparing
-> uncertainty, calibration, consistency, and factual reliability in large language
-> model outputs.**
+ATC Guardian is an educational air traffic control simulation and multi-agent safety research demonstrator. It models aircraft, vehicles, runway occupancy, structured clearances, pilot readbacks, weather, controller workload, hazards, interventions, and outcomes in a deterministic browser-based environment.
 
-Mirage is an open, local-first research platform for studying whether uncertainty
-signals predict labelled factual errors. It connects raw provider outputs to
-versioned datasets, deterministic correctness evaluators, calibration metrics,
-selective-prediction analysis, failure exploration, and reproducible exports.
+> **ATC Guardian is an educational simulation and research demonstrator. It is not certified for operational air traffic control and must not be used to direct real aircraft or airport vehicles.**
 
-Mirage is not a truth oracle and is not positioned as a guaranteed hallucination
-detector.
+## What works
 
-## Current capabilities
-
-- Genuine local Ollama evaluation with discovered installed models
-- Generic OpenAI-compatible chat-completions provider
-- Raw response, sampling, latency, usage, error, and provider trace storage
-- Local `all-minilm` embedding clustering with saved cosine-similarity matrices
-- Explicit lexical Jaccard fallback
-- A 200-item provenance-aware, source-gold-labelled reliability set
-- Dataset integrity and balance reports
-- Resumable per-example experiment execution and failed-example reruns
-- Bootstrap confidence intervals and paired signal comparisons
-- Held-out Platt and isotonic calibration
-- Data-derived Findings API/page and Markdown research-report generation
-
-## Demonstration mode
-
-The original 18-item cached demonstration remains available for a fast tour. Cached
-responses are stored separately from live outputs and always carry
-`execution_mode=cached_demo`. They are not current inference or benchmark evidence.
-
-## Research results
-
-One genuine local smoke experiment has been completed with `phi:latest`, Ollama,
-local `all-minilm` clustering, three verified examples, and two sampled responses per
-example. It measured 0/3 deterministic accuracy, mean latency 59.6 seconds per
-example, and no valid AUROC because all three answers were labelled incorrect.
-
-| Experiment | Model | N | Accuracy | AUROC | AUPRC | Status |
-|---|---|---:|---:|---:|---:|---|
-| `exp_2beb036aeb04eac1` | `phi:latest` | 3 | 0.000 | N/A | 1.000 | live smoke only |
-
-This run validates the live execution path; it does not answer the research question.
-The full 200-example, three-model configuration is
-[`config/research-experiment-v1.json`](config/research-experiment-v1.json) and has
-not been represented as completed.
-
-## Research motivation
-
-Mirage is designed to answer questions such as:
-
-- Which available uncertainty signal best separates correct and incorrect answers?
-- Does semantic disagreement correlate with factual error?
-- When is a model confidently wrong?
-- How much human review is required to reach a target selective accuracy?
-- How do prompts, decoding settings, models, and retrieval configurations change
-  reliability?
-
-The included starter study uses cached model outputs so the complete evaluation
-pipeline can run on a CPU-only laptop. It is clearly labelled demonstration data and
-must not be interpreted as a newly executed model benchmark.
-
-## Interface
-
-The responsive research interface contains:
-
-```text
-Overview → Playground → Experiments → Datasets → Compare
-         → Calibration → Failures → Reports → Methodology
-```
-
-The application provides interactive reliability diagrams, risk-coverage curves,
-signal-comparison tables, raw-output traces, failure slices, and experiment exports.
-Run it locally to view the current v2 interface; the public deployment may represent
-an earlier pushed version because this iteration is intentionally local-only.
-
-## What Mirage measures
-
-- Provider-native token uncertainty, only when actual log-probabilities exist
-- Semantic entropy over sampled-response groups
-- Exact and semantic response consistency
-- Answer-switch rate
-- Numerical variance and entity disagreement
-- Structured model self-verification as a fallible signal
-- Retrieval claim support when a retrieval provider is configured
-- Correlation between each available signal and labelled incorrectness
-- Calibration and selective-prediction behavior
-
-## What Mirage does not claim
-
-> Mirage does not determine whether an answer is factually correct solely from model
-> uncertainty. It evaluates whether selected uncertainty and consistency signals
-> correlate with labelled errors on a defined dataset. Results depend on the dataset,
-> model, evaluator, prompt, and sampling configuration.
-
-High model confidence does not guarantee correctness. Low confidence does not prove
-hallucination. Meaning-level agreement can be consistently wrong. Model
-self-verification is not independent ground truth.
+- Fixed-step, seed-labelled simulation with continuously moving aircraft and vehicles
+- Five selectable scenarios: Runway Occupied, Take-off & Crossing, Incorrect Altitude Readback, Weather & Unstable Approach, and High-Workload Cascade
+- Timed errors that change actual clearance, target altitude, weather, phase, and vehicle state
+- Deterministic runway, ground, communication, weather, and workload detection rules
+- Seven visible specialist agents and consolidated, evidence-backed recommendations
+- Accept, modify, and reject decisions that change aircraft/vehicle behavior and remain in the event log
+- Advisory mode and simulation-only Safety Interlock mode
+- Pause, resume, restart, step-forward, and 0.5×–4× speed controls
+- Communication transcript, event timeline, decision record, incident escalation, and outcome scoring
+- Responsive, keyboard-accessible operations console with reduced-motion support
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  D[Versioned dataset] --> R[Experiment runner]
-  C[Experiment config] --> R
-  P[Capability-aware provider] --> R
-  R --> O[Raw response store]
-  O --> S[Signal engine]
-  O --> E[Correctness evaluators]
-  S --> M[Calibration and discrimination metrics]
-  E --> M
-  M --> F[Failure analysis]
-  M --> X[JSON / CSV / Markdown / HTML exports]
-  O --> DB[(SQLite)]
-  S --> DB
-  E --> DB
+  S[Scenario definitions] --> E[Fixed-step simulation engine]
+  E --> D[Aircraft / vehicle dynamics]
+  E --> C[Structured clearance state]
+  E --> R[Deterministic safety rules]
+  R --> A[Specialist observations]
+  A --> G[Supervisor recommendations]
+  G --> U[Controller decision]
+  U --> E
+  E --> L[Event log and score]
+  L --> UI[React operations console]
 ```
 
-### Backend
+The domain layer in `src/simulation` has no React dependencies. `types.ts` defines the state contract, `scenarios.ts` owns reproducible scenario fixtures, and `engine.ts` advances movement, injects faults, evaluates rules, coordinates recommendations, applies interventions, and scores outcomes. The React layer renders state and dispatches explicit decisions.
 
-- FastAPI and Pydantic v2
-- Versioned experiment schema (`2.0`)
-- SQLite local persistence and migration registry
-- Deterministic experiment identifiers
-- Provider capability abstraction
-- JSON/JSONL dataset validation
-- Correctness, calibration, discrimination, and risk-coverage engines
-- Human-label overrides that preserve the automated label
-- Structured logging and safe API errors
+Critical detection does not use an LLM. Geometry and structured state are the source of truth. A future explanation provider may summarize verified observations, but it must never create safety facts or direct real traffic.
 
-### Frontend
+## Safety modes
 
-- React, TypeScript, and Vite
-- Recharts for data-driven visualisation
-- Responsive research navigation and accessible controls
-- Connected experiment, dataset, calibration, failure, and report workflows
+- **Advisory:** findings create recommendations; the simulation never applies a correction without the user.
+- **Safety Interlock:** predefined critical simulated clearances are marked blocked immediately. The user can still review and apply the corrective maneuver. This is strictly an educational mechanism inside the simulator.
 
-## Evaluation pipeline
+## Scenario authoring
 
-1. Load and validate a versioned labelled dataset.
-2. Load a provider and inspect its capability flags.
-3. Generate or read a primary response and multiple sampled responses.
-4. Preserve raw output, usage, latency, provider metadata, and errors.
-5. Calculate only signals supported by the provider.
-6. Evaluate correctness independently from uncertainty.
-7. Combine available signals into an explicitly experimental Mirage Risk Score.
-8. Compare risks with incorrectness labels.
-9. Calculate discrimination, calibration, and selective-prediction metrics.
-10. Store the record and export a reproducibility report.
+Add a `Scenario` to `src/simulation/scenarios.ts`. Define initial entity state and one or more `Injection` records with deterministic trigger times. Add reusable handling in `inject()` and state-derived detection in `rules()`; do not put scenario-specific safety logic in React. Every injected error should mutate domain state, have a detection rule, and have an intervention that changes the outcome.
 
-One failed example is stored as a per-example error and does not automatically turn
-into a valid result.
-
-## Metrics
-
-### Deterministic correctness
-
-- Normalised exact match
-- Acceptable-answer matching
-- Token F1
-- Numerical tolerance
-- Explicit unanswerable/premise-rejection evaluation
-- Preserved automated and human labels
-
-### Uncertainty and consistency
-
-Semantic entropy is calculated from response-cluster probabilities:
-
-```text
-H = -Σ p(c) log p(c)
-```
-
-The current CPU-safe fallback uses token-set Jaccard grouping and labels every
-cluster `lexical_fallback_jaccard`. It is not presented as neural NLI or embedding
-clustering.
-
-The cached provider does not expose token log-probabilities. Mirage therefore returns:
-
-```text
-token_uncertainty = null
-reason = "Provider did not return log probabilities."
-```
-
-It never invents token probabilities.
-
-### Calibration and discrimination
-
-- AUROC, with incorrectness as the positive class
-- AUPRC
-- Expected Calibration Error
-- Brier score
-- Negative log-likelihood
-- Reliability bins
-- Confidence/risk distribution data
-- Risk-coverage curve
-- Selective accuracy and error rate
-- Review rate at each risk threshold
-
-Calibration receives a visible warning when fewer than 30 labelled examples are
-available.
-
-## Dataset format
-
-Mirage accepts JSON arrays, JSONL, or manifests containing an `examples` array:
-
-```json
-{
-  "id": "fact_001",
-  "question": "Who wrote The Old Man and the Sea?",
-  "reference_answer": "Ernest Hemingway",
-  "acceptable_answers": ["Hemingway", "Ernest Miller Hemingway"],
-  "unanswerable": false,
-  "domain": "literature",
-  "difficulty": "easy",
-  "source": "manually_verified",
-  "tags": ["closed_book", "entity"],
-  "metadata": {}
-}
-```
-
-The bundled `mirage-starter` dataset spans factual knowledge, science, history,
-geography, medicine, law, finance, technology, ambiguity, unanswerable prompts,
-false premises, time-sensitive prompts, numerical questions, and multi-hop questions.
-It is a demonstration dataset, not a definitive benchmark.
-
-Uploaded datasets are validated before being saved to `data/datasets/`. User-supplied
-licensing remains the user's responsibility.
-
-## Provider interface
-
-Every provider declares:
-
-```python
-supports_logprobs: bool
-supports_seed: bool
-supports_streaming: bool
-supports_parallel_samples: bool
-supports_structured_output: bool
-supports_vision: bool
-supports_retrieval: bool
-supports_token_usage: bool
-```
-
-The local iteration implements cached-demo, Ollama, and generic OpenAI-compatible
-providers. API keys are read server-side and never stored in experiment metadata,
-errors, exports, or frontend responses.
-
-## Local installation
-
-Requirements:
-
-- Node.js 20+
-- Python 3.11+
-- npm
+## Local setup
 
 ```bash
-git clone https://github.com/aashita-46/Mirage-LLM.git
-cd Mirage-LLM
 npm install
-python -m pip install -r requirements.txt uvicorn pytest httpx
-```
-
-Terminal 1:
-
-```bash
-python -m uvicorn api.index:app --reload --port 8000
-```
-
-Terminal 2:
-
-```bash
 npm run dev
 ```
 
-Open `http://localhost:5173`.
+Open the Vite URL, select **Launch Simulation**, choose a scenario, and press **Simulate**. No external service or API key is required.
 
-The Vercel serverless deployment uses `/tmp/mirage.db`. This filesystem is
-ephemeral, so the hosted interface demonstrates the complete evaluation workflow but
-does not promise durable experiment storage between function instances. Use the
-local SQLite setup for reproducible persistence.
-
-## Docker
+## Verification
 
 ```bash
-docker compose up --build
-```
-
-Open `http://localhost:8080`. The named `mirage-data` volume preserves local SQLite
-records and uploaded datasets.
-
-## Running an experiment
-
-### Interface
-
-Open **Experiments**, choose a dataset and sample count, then select **Run
-evaluation**. The saved record becomes available in Compare, Calibration, Failures,
-and Reports.
-
-### Command line
-
-```bash
-python scripts/evaluate.py --config config/starter-experiment.json
-```
-
-Or:
-
-```bash
-python scripts/evaluate.py --name "My study" --samples 8 --export markdown
-```
-
-Live resumable research commands:
-
-```bash
-ollama pull all-minilm
-python scripts/dataset_stats.py mirage-reliability-set-v1
-python scripts/evaluate.py --config config/live-smoke-v1.json
-python scripts/evaluate.py --config config/research-experiment-v1.json --resume
-python scripts/evaluate.py --experiment-id EXPERIMENT_ID --rerun-failed
-python scripts/generate_research_report.py --experiment-group research-v1
-```
-
-Exports are written to `data/exports/`.
-
-## Reproducibility
-
-### Hardening and eligibility rules
-
-Metric definitions are exposed by `GET /api/v1/metrics` from one backend registry.
-Unavailable quantities remain `null` with an eligibility reason: for example, AUROC
-requires both correctness classes, semantic entropy requires at least two valid
-samples, and numerical variance requires at least two numeric responses. Missing
-signals are never substituted with zero.
-
-Semantic clusters use deterministic connected components over the thresholded
-similarity graph. The stored trace contains the algorithm, model identifier,
-threshold, input hashes, similarity matrix, assignments, representative and
-warnings. Numeric and negation contradiction checks are documented heuristics, not
-natural-language inference. Threshold sensitivity is descriptive and must not be
-used to select a threshold on the same test set.
-
-Each new experiment stores a SHA-256 dataset fingerprint and a versioned canonical
-configuration fingerprint covering metric versions and every configured
-result-affecting field. Changing dataset content without changing its displayed
-version therefore creates a different experiment identity. Human labels are
-effective for aggregates, calibration, routing, reports and exports, while the
-automated label and append-only override history remain preserved.
-
-Calibration results are out-of-sample only when the stored train and evaluation
-indices are disjoint. They are conditional on that dataset/model/prompt setting and
-should not be assumed to transfer. Bootstrap intervals use percentile resampling and
-record requested, valid and rejected samples; paired comparisons use identical
-resampled indices.
-
-Internal checks:
-
-```bash
-python scripts/validate_system.py all
-python scripts/analyse_threshold_sensitivity.py --experiment-group research-v1
-```
-
-Each experiment stores:
-
-- Deterministic experiment ID
-- Mirage schema version
-- Dataset name and version
-- Provider, model, and capability flags
-- Prompt and system prompt
-- Temperature, top-p, maximum tokens, seed, and sample count
-- Signal configuration and composite-score weights
-- Evaluator configuration
-- Retrieval configuration
-- Raw responses and sampled responses
-- Raw-output SHA-256 trace
-- Per-example metrics, correctness, errors, latency, usage, and failures
-- Aggregate metrics and small-sample warnings
-- Original and optional human labels
-
-The deterministic ID is derived from the schema, dataset identity, and complete
-experiment configuration. Repeating an identical configuration replaces the local
-record rather than creating a misleading duplicate.
-
-## Exports
-
-Saved experiments can be exported as:
-
-- JSON
-- CSV
-- Markdown
-- HTML
-
-Exports do not include API keys. PDF export is not claimed.
-
-## API
-
-```text
-GET    /api/v1/health
-GET    /api/v1/system
-GET    /api/v1/models
-GET    /api/v1/datasets
-GET    /api/v1/datasets/{name}
-POST   /api/v1/datasets/validate
-POST   /api/v1/datasets
-POST   /api/v1/analyse
-GET    /api/v1/experiments
-POST   /api/v1/experiments
-GET    /api/v1/experiments/{id}
-DELETE /api/v1/experiments/{id}
-POST   /api/v1/experiments/{id}/examples/{example_id}/override
-GET    /api/v1/experiments/{id}/export
-POST   /api/v1/experiments/compare
-```
-
-Interactive API documentation is at `http://localhost:8000/api/docs`.
-
-## Tests
-
-```bash
-python -m pytest -q
-npm test
 npm run lint
+npm test
 npm run build
-npm audit --audit-level=high
 ```
 
-Backend tests cover text normalisation, aliases, token F1, numerical tolerance,
-semantic-cluster contracts, AUROC, AUPRC, ECE, Brier score, risk coverage,
-unavailable log-probabilities, deterministic IDs, persistence, human-label
-preservation, validation failures, provider failures, API experiment creation, and
-exports.
+Unit/integration coverage checks reproducibility, movement-derived conflicts, runway occupancy, readback mismatch, weather rules, interlock behavior, Advisory behavior, and intervention state changes. Component tests cover launch, scenario availability, and lifecycle controls.
 
-## Adding a model provider
+## Current limitations
 
-1. Implement a provider with `generate(example, sampling_config)`.
-2. Return a `GenerationRecord` containing raw responses, usage, latency, and errors.
-3. Declare exact `ProviderCapabilities`.
-4. Return log-probabilities only when they come from the provider.
-5. Register the provider in the API model list and runner.
-6. Add a provider-independent integration test.
+- Airport geometry is a training abstraction, not a surveyed airport layout.
+- Kinematics and separation criteria are intentionally simplified and must not be used for operational prediction.
+- State replay is deterministic by scenario seed and decision log; a scrubber and persisted snapshot archive are future work.
+- Audio, speech recognition, live weather, and operational flight-data providers are not connected.
+- Interlock status blocks the simulated clearance record; it does not and cannot interface with real ATC systems.
+- Scoring is a transparent equal-weight composite for training feedback, not a validated controller assessment.
 
-Do not infer unsupported capabilities from a model name.
+## Future integrations
 
-## Adding a dataset
-
-Use the Datasets interface or add a validated manifest to `data/datasets/`. Include
-reference answers or set `unanswerable: true`. Document source and licensing. Do not
-store actionable professional medical or legal advice as a casual benchmark.
-
-## Methodology references
-
-- Kuhn et al. (2023), [Semantic Uncertainty: Linguistic Invariances for Uncertainty
-  Estimation in Natural Language Generation](https://arxiv.org/abs/2302.09664)
-- Guo et al. (2017), [On Calibration of Modern Neural
-  Networks](https://proceedings.mlr.press/v70/guo17a.html)
-- Geifman and El-Yaniv (2017), [Selective Classification for Deep Neural
-  Networks](https://arxiv.org/abs/1705.08500)
-- Lin et al. (2022), [Teaching Models to Express Their Uncertainty in
-  Words](https://arxiv.org/abs/2205.14334)
-
-## Limitations
-
-- Only the small smoke study has completed; the 200-example three-model study remains
-  computationally expensive on this six-core CPU.
-- The new reliability set uses source benchmark gold annotations and has not received
-  independent item-by-item Mirage review.
-- Its current 80% answerable / 20% unanswerable balance misses the intended design
-  targets and contains no verified false-premise or ambiguous slice.
-- Domain mapping is coarse and the technology slice is absent.
-- Deterministic evaluation is too strict for some open-ended TruthfulQA answers;
-  disputed examples require human review or a carefully validated judge.
-- Embedding grouping is materially stronger than lexical overlap but is not
-  bidirectional NLI and can still merge or split meanings incorrectly.
-- Self-verification is a model-derived signal and may be confidently wrong.
-- The starter dataset is too small for strong calibration conclusions.
-- No live retrieval provider is configured, so retrieval faithfulness is unavailable.
-- No token log-probabilities are available from the cached provider.
-- The experimental composite score is configurable but not universally validated.
-- Platt and isotonic fitting use disjoint stratified indices, but calibration remains
-  unstable for small or highly imbalanced error sets.
-- Results are conditional on dataset, provider outputs, evaluator, prompts, decoding,
-  and sampling configuration.
-
-## Roadmap
-
-- OpenAI-compatible and local Ollama provider adapters
-- CPU-friendly embedding and NLI clustering
-- Retrieval claim extraction and citation precision
-- Platt, logistic, and isotonic calibration with strict held-out evaluation
-- Dataset import/export and failed-example reruns
-- Prompt/config duplication and broader experiment comparison
-- Larger licensed datasets and human evaluation
-- Conformal risk control and abstention policies
-
-## Citation
-
-If Mirage supports research or teaching work, cite the repository and record the
-experiment schema version, dataset version, configuration export, and commit hash.
-
-```bibtex
-@software{mirageeval2026,
-  title = {MirageEval: A Local-First Platform for LLM Reliability, Uncertainty and Selective Prediction},
-  author = {Ninad Naik and Aashita Jolly},
-  year = {2026},
-  url = {https://github.com/aashita-46/Mirage-LLM},
-  version = {2.0}
-}
-```
+Provider interfaces can be introduced for voice, weather, transcription, aircraft data, and natural-language explanations. Local deterministic implementations must remain the default, secrets must stay server-side, and external model output must never become the safety source of truth.
